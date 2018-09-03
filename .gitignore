@@ -4,3 +4,10 @@ venv/
 __pycache__/
 resnet_data_in/
 resnet_data_out/
+
+# my-specific
+resnet.json
+resnet_imagenet.json
+run.sh
+train.sh
+user_dev_workspace/
