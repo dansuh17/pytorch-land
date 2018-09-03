@@ -69,4 +69,3 @@ if __name__ == '__main__':
     print(net)
     sample_batch = torch.randn((10, 3, 224, 224))
     print(net(sample_batch).size())
-
