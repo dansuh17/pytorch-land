@@ -1,5 +1,7 @@
 import os
-from model import ResNet34
+import math
+import random
+from model import ResNet34, ResNet32
 import torch
 from torch import optim, nn
 from torch.utils import data
@@ -9,53 +11,38 @@ from tensorboardX import SummaryWriter
 
 
 class ResnetTrainer:
-    def __init__(self):
+    def __init__(self, dataset_name='cifar10'):
         self.input_root_dir = 'resnet_data_in'
         self.output_root_dir = 'resnet_data_out'
-        self.train_img_dir = os.path.join(self.input_root_dir, 'imagenet')
         self.log_dir = os.path.join(self.output_root_dir, 'tblogs')
         self.models_dir = os.path.join(self.output_root_dir, 'models')
         # create directories
         os.makedirs(self.log_dir, exist_ok=True)
         os.makedirs(self.models_dir, exist_ok=True)
 
-        self.image_dim = 224
         self.num_devices = 4
         self.batch_size = 256
         self.lr_init = 0.1
         self.end_epoch = 70
 
-        self.dataset_name = 'cifar10'  # or 'cifar100' or 'imagenet'
+        self.dataset_name = dataset_name  # or 'cifar100' or 'imagenet'
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.device_ids = list([i for i in range(self.num_devices)])
         self.seed = torch.initial_seed()
         print('Using seed : {}'.format(self.seed))
 
-        resnet = ResNet34(num_classes=1000).to(self.device)
+        self.dataloader, self.validate_dataloader, self.train_dataloader, self.num_classes, self.image_dim \
+                = self.load_dataloaders(name=self.dataset_name)
+        self.validation_dataloader = None
+        print('DataLoader created')
+
+        resnet = ResNet32(num_classes=self.num_classes, input_dim=self.image_dim).to(self.device)
         self.resnet = torch.nn.parallel.DataParallel(resnet, device_ids=self.device_ids)
         print('Model created')
         print(self.resnet)
 
-        self.dataset = datasets.ImageFolder(self.train_img_dir, transforms.Compose([
-            transforms.CenterCrop(self.image_dim),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-        ]))
-        print('Dataset created')
-
-        self.dataloader = data.DataLoader(
-            self.dataset,
-            shuffle=True,
-            pin_memory=True,
-            drop_last=True,
-            num_workers=4,
-            batch_size=self.batch_size
-        )
-        self.validation_dataloader = None
-        print('DataLoader created')
-
         self.optimizer = optim.SGD(
-            params=self.vggnet.parameters(),
+            params=self.resnet.parameters(),
             lr=self.lr_init,
             weight_decay=0.0001,
             momentum=0.9
@@ -69,12 +56,101 @@ class ResnetTrainer:
         print('Criterion : {}'.format(self.criterion))
 
         self.lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-            self.optimizer, mode='min', factor=0.1,
-            patience=5, verbose=True)
+            self.optimizer, mode='min', factor=0.1, patience=5, verbose=True)
         print('LR scheduler created')
 
         self.epoch, self.total_steps = self.set_train_status()
         print('Starting from - Epoch : {}, Step : {}'.format(self.epoch, self.total_steps))
+
+    def load_dataloaders(self, name: str):
+        normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        if name == 'imagenet':
+            train_img_dir = os.path.join(self.input_root_dir, 'imagenet')
+            num_classes = 1000
+            image_dim = 32
+            dataset = datasets.ImageFolder(train_img_dir, transforms.Compose([
+                transforms.CenterCrop(image_dim),
+                transforms.RandomHorizontalFlip(),
+                transforms.ToTensor(),
+                normalize,
+            ]))
+            # TODO: split
+        elif name == 'cifar10':
+            train_img_dir = os.path.join(self.input_root_dir, 'cifar10')
+            num_classes = 10
+            image_dim = 32
+            dataset = datasets.CIFAR10(
+                root=train_img_dir, train=True, download=True,
+                transform=transforms.Compose([
+                    transforms.RandomHorizontalFlip(),
+                    transforms.RandomResizedCrop(image_dim, scale=(0.8, 1.0)),
+                    transforms.ToTensor(),
+                    normalize,
+                ]))
+            validate_dataset = datasets.CIFAR10(
+                root=train_img_dir, train=True, download=True,
+                transform=transforms.Compose([
+                    transforms.RandomHorizontalFlip(),
+                    transforms.RandomResizedCrop(image_dim, scale=(0.8, 1.0)),
+                    transforms.ToTensor(),
+                    normalize,
+                ]))
+            num_data = len(dataset)
+            indices = list(range(num_data))
+            random.shuffle(indices)
+            num_train = math.floor(num_data * 0.8)
+            train_idx, validate_idx = indices[:num_train], indices[num_train:]
+
+            # create data loaders out of datasets
+            train_dataloader = data.DataLoader(
+                dataset,
+                sampler=data.SubsetRandomSampler(train_idx),
+                pin_memory=True,
+                drop_last=True,
+                num_workers=4,
+                batch_size=self.batch_size
+            )
+            validate_dataloader = data.DataLoader(
+                dataset,
+                sampler=data.SubsetRandomSampler(validate_idx),
+                pin_memory=True,
+                drop_last=True,
+                num_workers=4,
+                batch_size=self.batch_size
+            )
+
+            train_dataset = datasets.CIFAR10(
+                root=train_img_dir, train=False, download=True,
+                transform=transforms.Compose([
+                    transforms.ToTensor(),
+                    normalize,
+                ]))
+            test_dataloader = data.DataLoader(
+                dataset,
+                batch_size=self.batch_size,
+                pin_memory=True,
+                drop_last=True,
+                num_workers=4
+            )
+        elif name == 'cifar100':
+            train_img_dir = os.path.join(self.input_root_dir, 'cifar100')
+            num_classes = 100
+            image_dim = 32
+            dataset = datasets.CIFAR100(
+                root=train_img_dir, train=True, download=True,
+                transform=transforms.Compose([
+                    transforms.RandomHorizontalFlip(),
+                    transforms.RandomResizedCrop(image_dim, scale=(0.8, 1.0)),
+                    transforms.ToTensor(),
+                    normalize,
+                ]))
+            # TODO: split
+        else:
+            raise ValueError('Unsupported dataset : {}'.format(name))
+
+        # split the dataset into train / validate/ test sets
+        return train_dataloader, validate_dataloader, test_dataloader, num_classes, image_dim
+        print('Dataset created')
 
     def train(self):
         for _ in range(self.epoch, self.end_epoch):
@@ -145,7 +221,7 @@ class ResnetTrainer:
     def calc_batch_accuracy(self, output, target):
         _, preds = torch.max(output, 1)
         # devide by batch size for averaging
-        accuracy = torch.sum(preds == targets).float() / targets.size()[0]
+        accuracy = torch.sum(preds == target).float() / target.size()[0]
         return accuracy
 
     def save_performance_summary(self, loss, accuracy, summary_group='train'):
@@ -200,3 +276,4 @@ class ResnetTrainer:
 
 if __name__ == '__main__':
     trainer = ResnetTrainer()
+    trainer.train()

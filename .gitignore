@@ -2,3 +2,5 @@ tags
 venv/
 .idea/
 __pycache__/
+resnet_data_in/
+resnet_data_out/
