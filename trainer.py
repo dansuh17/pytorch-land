@@ -22,7 +22,7 @@ class ResnetTrainer:
 
         self.num_devices = 4
         self.batch_size = 256
-        self.lr_init = 0.1
+        self.lr_init = 0.0001
         self.end_epoch = 70
 
         self.dataset_name = dataset_name  # or 'cifar100' or 'imagenet'
@@ -104,7 +104,7 @@ class ResnetTrainer:
             # create data loaders out of datasets
             train_dataloader = data.DataLoader(
                 dataset,
-                sampler=data.SubsetRandomSampler(train_idx),
+                sampler=data.sampler.SubsetRandomSampler(train_idx),
                 pin_memory=True,
                 drop_last=True,
                 num_workers=4,
@@ -112,7 +112,7 @@ class ResnetTrainer:
             )
             validate_dataloader = data.DataLoader(
                 dataset,
-                sampler=data.SubsetRandomSampler(validate_idx),
+                sampler=data.sampler.SubsetRandomSampler(validate_idx),
                 pin_memory=True,
                 drop_last=True,
                 num_workers=4,
@@ -254,9 +254,9 @@ class ResnetTrainer:
 
     def save_checkpoint(self):
         model_path = os.path.join(
-            self.model_path, 'resnet_e{}.pkl'.format(self.epoch))
+            self.models_dir, 'resnet_e{}.pkl'.format(self.epoch))
         checkpoint_path = os.path.join(
-            self.model_path, 'resnet_e{}_state.pkl'.format(self.epoch))
+            self.models_dir, 'resnet_e{}_state.pkl'.format(self.epoch))
         # save the model and related checkpoints
         torch.save(self.resnet, model_path)
         torch.save({
