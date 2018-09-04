@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 
 def init_weights(m):
@@ -21,16 +22,15 @@ class ResBlock(nn.Module):
     def __init__(self, in_channels, out_channels, convs=2):
         super().__init__()
         self.downsample_required = in_channels != out_channels
+        conv_layers = []
         if self.downsample_required:
             conv_layers = [nn.Conv2d(in_channels, out_channels, 3, stride=2, padding=1)]
-            conv_layers.extend([
-                nn.Conv2d(out_channels, out_channels, 3, padding=1)
-                for _ in range(convs - 1)])
+            for _ in range(convs - 1):
+                conv_layers.extend([nn.ReLU(inplace=True), nn.Conv2d(out_channels, out_channels, 3, padding=1)])
             self.downsamp_conv = nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=2)
         else:
-            conv_layers = [
-                nn.Conv2d(in_channels, out_channels, 3, padding=1)
-                for _ in range(convs)]
+            for _ in range(convs - 1):
+                conv_layers.extend([nn.ReLU(inplace=True), nn.Conv2d(in_channels, out_channels, 3, padding=1)]
             self.downsamp_conv = None  # no need to downsample the residual with 1x1 conv
         # make conv layers a sequential operation
         self.conv_layers = nn.Sequential(*conv_layers)
@@ -41,7 +41,7 @@ class ResBlock(nn.Module):
             x = self.conv_layers(x) + self.downsamp_conv(x)
         else:
             x = self.conv_layers(x) + x
-        return x
+        return F.relu(x, inplace=True)
 
 
 class ResNet32(nn.Module):

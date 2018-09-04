@@ -22,8 +22,8 @@ class ResnetTrainer:
 
         self.num_devices = 4
         self.batch_size = 256
-        self.lr_init = 0.001
-        self.end_epoch = 70
+        self.lr_init = 0.00001
+        self.end_epoch = 200
 
         self.dataset_name = dataset_name  # or 'cifar100' or 'imagenet'
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -41,12 +41,13 @@ class ResnetTrainer:
         print('Model created')
         print(self.resnet)
 
-        self.optimizer = optim.SGD(
-            params=self.resnet.parameters(),
-            lr=self.lr_init,
-            weight_decay=0.0001,
-            momentum=0.9
-        )
+        # self.optimizer = optim.SGD(
+        #     params=self.resnet.parameters(),
+        #     lr=self.lr_init,
+        #     weight_decay=0.0001,
+        #     momentum=0.9
+        # )
+        self.optimizer = optim.Adam(params=self.resnet.parameters(), lr=self.lr_init)
         print('Optimizer created')
 
         self.summary_writer = SummaryWriter(log_dir=self.log_dir)
@@ -186,7 +187,7 @@ class ResnetTrainer:
                     accuracy = self.calc_batch_accuracy(output, targets)
                     total_loss += loss.item()
                     total_accuracy += accuracy.item()
-                    self.save_performance_summary(loss, accuracy)
+                    self.save_performance_summary(loss.item(), accuracy.item())
 
                 if self.total_steps % 100 == 0:
                     self.save_model_summary()
@@ -225,7 +226,6 @@ class ResnetTrainer:
         return accuracy
 
     def save_performance_summary(self, loss, accuracy, summary_group='train'):
-        loss, accuracy = loss.item(), accuracy.item()
         print('Epoch: {}\tStep: {}\tLoss: {:.6f}\tAcc: {:.6f}'
             .format(self.epoch, self.total_steps, loss, accuracy))
         self.summary_writer.add_scalar(
