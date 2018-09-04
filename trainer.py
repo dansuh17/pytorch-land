@@ -22,7 +22,7 @@ class ResnetTrainer:
 
         self.num_devices = 4
         self.batch_size = 256
-        self.lr_init = 0.0001
+        self.lr_init = 0.001
         self.end_epoch = 70
 
         self.dataset_name = dataset_name  # or 'cifar100' or 'imagenet'
@@ -215,7 +215,7 @@ class ResnetTrainer:
     def validate(self):
         with torch.no_grad():
             val_loss, val_acc = self.run_epoch(self.validate_dataloader, train=False)
-            self.save_performance_summary(loss, accuracy, summary_group='validate')
+            self.save_performance_summary(val_loss, val_acc, summary_group='validate')
         return val_loss, val_acc
 
     def calc_batch_accuracy(self, output, target):
