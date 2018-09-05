@@ -196,7 +196,6 @@ class ResnetTrainer:
                 self.total_steps += 1
             else:  # no training - validation
                 accuracy = self.calc_batch_accuracy(output, targets)
-                print('Accuracy : {}'.format(accuracy))
                 accs.append(accuracy.item())
                 losses.append(loss.item())
 
