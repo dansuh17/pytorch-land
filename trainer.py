@@ -31,7 +31,7 @@ class ResnetTrainer:
         self.seed = torch.initial_seed()
         print('Using seed : {}'.format(self.seed))
 
-        self.dataloader, self.validate_dataloader, self.train_dataloader, self.num_classes, self.image_dim \
+        self.dataloader, self.validate_dataloader, self.test_dataloader, self.num_classes, self.image_dim \
                 = self.load_dataloaders(name=self.dataset_name)
         self.validation_dataloader = None
         print('DataLoader created')
@@ -65,8 +65,8 @@ class ResnetTrainer:
         print('Starting from - Epoch : {}, Step : {}'.format(self.epoch, self.total_steps))
 
     def load_dataloaders(self, name: str):
-        normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         if name == 'imagenet':
+            normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
             train_img_dir = os.path.join(self.input_root_dir, 'imagenet')
             num_classes = 1000
             image_dim = 32
@@ -78,22 +78,23 @@ class ResnetTrainer:
             ]))
             # TODO: split
         elif name == 'cifar10':
+            normalize = transforms.Normalize(mean=[0.4914, 0.4822, 0.4465], std=[0.2023, 0.1994, 0.2010])
             train_img_dir = os.path.join(self.input_root_dir, 'cifar10')
             num_classes = 10
             image_dim = 32
             dataset = datasets.CIFAR10(
                 root=train_img_dir, train=True, download=True,
                 transform=transforms.Compose([
+                    transforms.RandomCrop(image_dim, padding=4),
                     transforms.RandomHorizontalFlip(),
-                    transforms.RandomResizedCrop(image_dim, scale=(0.8, 1.0)),
                     transforms.ToTensor(),
                     normalize,
                 ]))
             validate_dataset = datasets.CIFAR10(
                 root=train_img_dir, train=True, download=True,
                 transform=transforms.Compose([
+                    transforms.RandomCrop(image_dim, padding=4),
                     transforms.RandomHorizontalFlip(),
-                    transforms.RandomResizedCrop(image_dim, scale=(0.8, 1.0)),
                     transforms.ToTensor(),
                     normalize,
                 ]))
@@ -164,6 +165,8 @@ class ResnetTrainer:
             self.lr_scheduler.step(val_loss)
             self.save_learning_rate()
             self.epoch += 1
+        test_loss, test_acc = self.run_epoch(self.test_dataloader, train=False)
+        print('Test set loss: {:.6f} acc: {:.4f}'.format(test_loss, test_acc))
         print('Training complete')
 
     def run_epoch(self, dataloader, train=True):

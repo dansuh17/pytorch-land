@@ -6,10 +6,13 @@ import torch.nn.functional as F
 def init_weights(m):
     """Initialize weights for convolutional and linear layers."""
     if isinstance(m, nn.Conv2d):
-        nn.init.xavier_normal_(m.weight)
+        nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
         nn.init.constant_(m.bias, 0)
     elif isinstance(m, nn.Linear):
         nn.init.xavier_normal_(m.weight)
+        nn.init.constant_(m.bias, 0)
+    elif isinstance(m, nn.BatchNorm2d):
+        nn.init.constant_(m.weight, 1)
         nn.init.constant_(m.bias, 0)
 
 
@@ -23,14 +26,38 @@ class ResBlock(nn.Module):
         super().__init__()
         self.downsample_required = in_channels != out_channels
         if self.downsample_required:
-            conv_layers = [nn.Conv2d(in_channels, out_channels, 3, stride=2, padding=1)]
-            for _ in range(convs - 1):
-                conv_layers.extend([nn.ReLU(inplace=True), nn.Conv2d(out_channels, out_channels, 3, padding=1)])
-            self.downsamp_conv = nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=2)
+            conv_layers = [
+                nn.Conv2d(in_channels, out_channels, 3, stride=2, padding=1), 
+                nn.BatchNorm2d(out_channels),
+                nn.ReLU(inplace=True),
+            ]
+            for _ in range(convs - 2):
+                conv_layers.extend([
+                    nn.Conv2d(out_channels, out_channels, 3, padding=1),
+                    nn.BatchNorm2d(out_channels),
+                    nn.ReLU(inplace=True), 
+                ])
+            conv_layers.extend([
+                nn.Conv2d(out_channels, out_channels, 3, padding=1),
+                nn.BatchNorm2d(out_channels),
+            ])
+            # TODO: test with BN after 1x1 Conv
+            self.downsamp_conv = nn.Sequential(
+                nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=2),
+                nn.BatchNorm2d(out_channels),
+            )
         else:
-            conv_layers = [nn.Conv2d(in_channels, out_channels, 3, padding=1)]
+            conv_layers = []
             for _ in range(convs - 1):
-                conv_layers.extend([nn.ReLU(inplace=True), nn.Conv2d(in_channels, out_channels, 3, padding=1)])
+                conv_layers.extend([
+                    nn.Conv2d(in_channels, out_channels, 3, padding=1),
+                    nn.BatchNorm2d(out_channels),
+                    nn.ReLU(inplace=True), 
+                ])
+            conv_layers.extend([
+                nn.Conv2d(out_channels, out_channels, 3, padding=1),
+                nn.BatchNorm2d(out_channels),
+            ])
             self.downsamp_conv = None  # no need to downsample the residual with 1x1 conv
         # make conv layers a sequential operation
         self.conv_layers = nn.Sequential(*conv_layers)
@@ -50,10 +77,10 @@ class ResNet32(nn.Module):
         # input size : (b x 3 x 32 x 32)
         dim_shrink_rate = 1
         self.conv_1 = nn.Conv2d(in_channels=3, out_channels=16, kernel_size=3, padding=1)  # (b x 16 x 32 x 32)
-        res1 = [ResBlock(16, 16, convs=2) for _ in range(5)]  # (b x 16 x 32 x 32)
-        res2 = [ResBlock(16, 32, convs=2)] + [ResBlock(32, 32, convs=2) for _ in range(4)]  # (b x 32 x 16 x 16)
+        res1 = [ResBlock(16, 16) for _ in range(5)]  # (b x 16 x 32 x 32)
+        res2 = [ResBlock(16, 32)] + [ResBlock(32, 32) for _ in range(4)]  # (b x 32 x 16 x 16)
         dim_shrink_rate *= 2
-        res3 = [ResBlock(32, 64, convs=2)] + [ResBlock(64, 64, convs=2) for _ in range(4)]  # (b x 64 x 8 x 8)
+        res3 = [ResBlock(32, 64)] + [ResBlock(64, 64) for _ in range(4)]  # (b x 64 x 8 x 8)
         dim_shrink_rate *= 2
 
         self.res = nn.Sequential(*(res1 + res2 + res3))
@@ -82,12 +109,12 @@ class ResNet34(nn.Module):
         dim_shrink_rate *= 2
 
         # create residual blocks
-        res_1 = [ResBlock(64, 64, convs=2) for _ in range(3)]  # (b x 64 x 56 x 56)
-        res_2 = [ResBlock(64, 128, convs=2)] + [ResBlock(128, 128, convs=2) for _ in range(3)]  # (b x 128 x 28 x 28)
+        res_1 = [ResBlock(64, 64) for _ in range(3)]  # (b x 64 x 56 x 56)
+        res_2 = [ResBlock(64, 128)] + [ResBlock(128, 128) for _ in range(3)]  # (b x 128 x 28 x 28)
         dim_shrink_rate *= 2
-        res_3 = [ResBlock(128, 256, convs=2)] + [ResBlock(256, 256, convs=2) for _ in range(5)]  # (b x 256 x 14 x 14)
+        res_3 = [ResBlock(128, 256)] + [ResBlock(256, 256) for _ in range(5)]  # (b x 256 x 14 x 14)
         dim_shrink_rate *= 2
-        res_4 = [ResBlock(256, 512, convs=2)] + [ResBlock(512, 512, convs=2) for _ in range(2)]  # (b x 512 x 7 x 7)
+        res_4 = [ResBlock(256, 512)] + [ResBlock(512, 512) for _ in range(2)]  # (b x 512 x 7 x 7)
         dim_shrink_rate *= 2
 
         # make residual blocks a sequential operation
