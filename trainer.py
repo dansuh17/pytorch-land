@@ -22,7 +22,7 @@ class ResnetTrainer:
 
         self.num_devices = 4
         self.batch_size = 256
-        self.lr_init = 0.0001
+        self.lr_init = 0.001
         self.end_epoch = 200
 
         self.dataset_name = dataset_name  # or 'cifar100' or 'imagenet'
@@ -58,7 +58,7 @@ class ResnetTrainer:
         print('Criterion : {}'.format(self.criterion))
 
         self.lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-            self.optimizer, mode='min', factor=0.1, patience=5, verbose=True)
+            self.optimizer, mode='min', factor=0.1, patience=10, cooldown=30, verbose=True)
         print('LR scheduler created')
 
         self.epoch, self.total_steps = self.set_train_status()
@@ -100,7 +100,7 @@ class ResnetTrainer:
             num_data = len(dataset)
             indices = list(range(num_data))
             random.shuffle(indices)
-            num_train = math.floor(num_data * 0.8)
+            num_train = math.floor(num_data * 0.9)
             train_idx, validate_idx = indices[:num_train], indices[num_train:]
 
             # create data loaders out of datasets
