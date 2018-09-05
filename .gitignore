@@ -11,3 +11,4 @@ resnet_imagenet.json
 run.sh
 train.sh
 user_dev_workspace/
+log.log

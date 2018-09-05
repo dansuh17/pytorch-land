@@ -22,7 +22,7 @@ class ResnetTrainer:
 
         self.num_devices = 4
         self.batch_size = 256
-        self.lr_init = 0.00001
+        self.lr_init = 0.0001
         self.end_epoch = 200
 
         self.dataset_name = dataset_name  # or 'cifar100' or 'imagenet'
@@ -41,6 +41,7 @@ class ResnetTrainer:
         print('Model created')
         print(self.resnet)
 
+        # Optimizer used for original paper - which doesn't train well
         # self.optimizer = optim.SGD(
         #     params=self.resnet.parameters(),
         #     lr=self.lr_init,
@@ -109,7 +110,7 @@ class ResnetTrainer:
                 pin_memory=True,
                 drop_last=True,
                 num_workers=4,
-                batch_size=self.batch_size
+                batch_size=self.batch_size,
             )
             validate_dataloader = data.DataLoader(
                 dataset,
@@ -117,7 +118,7 @@ class ResnetTrainer:
                 pin_memory=True,
                 drop_last=True,
                 num_workers=4,
-                batch_size=self.batch_size
+                batch_size=self.batch_size,
             )
 
             train_dataset = datasets.CIFAR10(
@@ -128,10 +129,10 @@ class ResnetTrainer:
                 ]))
             test_dataloader = data.DataLoader(
                 dataset,
-                batch_size=self.batch_size,
                 pin_memory=True,
                 drop_last=True,
-                num_workers=4
+                num_workers=4,
+                batch_size=self.batch_size,
             )
         elif name == 'cifar100':
             train_img_dir = os.path.join(self.input_root_dir, 'cifar100')
@@ -161,13 +162,13 @@ class ResnetTrainer:
 
             val_loss, _ = self.validate()
             self.lr_scheduler.step(val_loss)
-            self.save_checkpoint()
+            self.save_learning_rate()
             self.epoch += 1
         print('Training complete')
 
     def run_epoch(self, dataloader, train=True):
-        total_loss = 0
-        total_accuracy = 0
+        losses = []
+        accs = []
         num_iters = len(dataloader.dataset)
         for imgs, targets in dataloader:
             imgs, targets = imgs.to(self.device), targets.to(self.device)
@@ -185,21 +186,22 @@ class ResnetTrainer:
                 # save training results
                 if self.total_steps % 10 == 0:
                     accuracy = self.calc_batch_accuracy(output, targets)
-                    total_loss += loss.item()
-                    total_accuracy += accuracy.item()
+                    accs.append(accuracy.item())
+                    losses.append(loss.item())
                     self.save_performance_summary(loss.item(), accuracy.item())
 
                 if self.total_steps % 100 == 0:
                     self.save_model_summary()
 
                 self.total_steps += 1
-            else:  # no training - (validate)
-                total_loss += loss.item()
+            else:  # no training - validation
                 accuracy = self.calc_batch_accuracy(output, targets)
-                total_accuracy += accuracy.item()
+                print('Accuracy : {}'.format(accuracy))
+                accs.append(accuracy.item())
+                losses.append(loss.item())
 
-        avg_loss = total_loss / num_iters
-        avg_acc = total_accuracy / num_iters
+        avg_loss = sum(losses) / len(losses)
+        avg_acc = sum(accs) / len(accs)
         return avg_loss, avg_acc
 
     def set_train_status(self, resume=False):
@@ -221,7 +223,7 @@ class ResnetTrainer:
 
     def calc_batch_accuracy(self, output, target):
         _, preds = torch.max(output, 1)
-        # devide by batch size for averaging
+        # devide by batch size to get ratio
         accuracy = torch.sum(preds == target).float() / target.size()[0]
         return accuracy
 
@@ -232,6 +234,12 @@ class ResnetTrainer:
             '{}/loss'.format(summary_group), loss, self.total_steps)
         self.summary_writer.add_scalar(
             '{}/accuracy'.format(summary_group), accuracy, self.total_steps)
+
+    def save_learning_rate(self):
+        """Save learning rate to summary."""
+        for idx, param_group in enumerate(self.optimizer.param_groups):
+            lr = param_group['lr']
+            self.summary_writer.add_scalar('lr/{}'.format(idx), lr, self.total_steps)
 
     def save_model_summary(self):
         with torch.no_grad():
@@ -245,12 +253,12 @@ class ResnetTrainer:
                         'grad/{}'.format(name), parameter.grad.cpu().numpy(), self.total_steps)
                 if parameter.data is not None:
                     avg_weight = torch.mean(parameter.data)
-                    print('\tavg_weight for {} = {:.6f}'.format(name, avg_weight))
+                    # print('\tavg_weight for {} = {:.6f}'.format(name, avg_weight))
                     self.summary_writer.add_scalar(
                         'avg_weight/{}'.format(name), avg_weight.item(), self.total_steps)
                     self.summary_writer.add_histogram(
                         'weight/{}'.format(name), parameter.data.cpu().numpy(), self.total_steps)
-                print()
+            print()
 
     def save_checkpoint(self):
         model_path = os.path.join(
