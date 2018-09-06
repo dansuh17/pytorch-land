@@ -12,6 +12,12 @@ from tensorboardX import SummaryWriter
 
 class ResnetTrainer:
     def __init__(self, dataset_name='imagenet'):
+        """
+        Trainer for model.
+
+        Args:
+            dataset_name (str): name of dataset. either one of: 'imagenet', 'cifar10', 'cifar100'
+        """
         self.input_root_dir = 'resnet_data_in'
         self.output_root_dir = 'resnet_data_out'
         self.log_dir = os.path.join(self.output_root_dir, 'tblogs')
@@ -244,6 +250,9 @@ class ResnetTrainer:
         print('Dataset created')
 
     def train(self):
+        """
+        The entire training session.
+        """
         for _ in range(self.epoch, self.end_epoch):
             self.summary_writer.add_scalar('epoch', self.epoch, self.total_steps)
             self.run_epoch(self.dataloader)
@@ -258,6 +267,13 @@ class ResnetTrainer:
         print('Training complete')
 
     def run_epoch(self, dataloader, train=True):
+        """
+        Run the model for one epoch (= full iteration) of the given data loader.
+
+        Args:
+            dataloader: loader for dataset.
+            train (bool): True if performing parameter updates for the model
+        """
         losses = []
         accs = []
         num_iters = len(dataloader.dataset)
