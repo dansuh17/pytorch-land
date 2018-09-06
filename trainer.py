@@ -11,7 +11,7 @@ from tensorboardX import SummaryWriter
 
 
 class ResnetTrainer:
-    def __init__(self, dataset_name='cifar10'):
+    def __init__(self, dataset_name='cifar100'):
         self.input_root_dir = 'resnet_data_in'
         self.output_root_dir = 'resnet_data_out'
         self.log_dir = os.path.join(self.output_root_dir, 'tblogs')
@@ -69,9 +69,15 @@ class ResnetTrainer:
             normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
             train_img_dir = os.path.join(self.input_root_dir, 'imagenet')
             num_classes = 1000
-            image_dim = 32
+            image_dim = 224
             dataset = datasets.ImageFolder(train_img_dir, transforms.Compose([
-                transforms.CenterCrop(image_dim),
+                transforms.RandomCrop(image_dim, padding=4),
+                transforms.RandomHorizontalFlip(),
+                transforms.ToTensor(),
+                normalize,
+            ]))
+            dataset = datasets.ImageFolder(train_img_dir, transforms.Compose([
+                transforms.CenterCrop(image_dim, padding=4),
                 transforms.RandomHorizontalFlip(),
                 transforms.ToTensor(),
                 normalize,
@@ -136,18 +142,64 @@ class ResnetTrainer:
                 batch_size=self.batch_size,
             )
         elif name == 'cifar100':
+            normalize = transforms.Normalize(mean=[0.4914, 0.4822, 0.4465], std=[0.2023, 0.1994, 0.2010])
             train_img_dir = os.path.join(self.input_root_dir, 'cifar100')
             num_classes = 100
             image_dim = 32
             dataset = datasets.CIFAR100(
                 root=train_img_dir, train=True, download=True,
                 transform=transforms.Compose([
+                    transforms.RandomCrop(image_dim, padding=4),
                     transforms.RandomHorizontalFlip(),
-                    transforms.RandomResizedCrop(image_dim, scale=(0.8, 1.0)),
                     transforms.ToTensor(),
                     normalize,
                 ]))
-            # TODO: split
+            validate_dataset = datasets.CIFAR100(
+                root=train_img_dir, train=True, download=True,
+                transform=transforms.Compose([
+                    transforms.RandomCrop(image_dim, padding=4),
+                    transforms.RandomHorizontalFlip(),
+                    transforms.ToTensor(),
+                    normalize,
+                ]))
+            num_data = len(dataset)
+            print('Dataset size : {}'.format(num_data))
+            indices = list(range(num_data))
+            random.shuffle(indices)
+            num_train = math.floor(num_data * 0.9)
+            train_idx, validate_idx = indices[:num_train], indices[num_train:]
+
+            # create data loaders out of datasets
+            train_dataloader = data.DataLoader(
+                dataset,
+                sampler=data.sampler.SubsetRandomSampler(train_idx),
+                pin_memory=True,
+                drop_last=True,
+                num_workers=4,
+                batch_size=self.batch_size,
+            )
+            validate_dataloader = data.DataLoader(
+                dataset,
+                sampler=data.sampler.SubsetRandomSampler(validate_idx),
+                pin_memory=True,
+                drop_last=True,
+                num_workers=4,
+                batch_size=self.batch_size,
+            )
+
+            train_dataset = datasets.CIFAR10(
+                root=train_img_dir, train=False, download=True,
+                transform=transforms.Compose([
+                    transforms.ToTensor(),
+                    normalize,
+                ]))
+            test_dataloader = data.DataLoader(
+                dataset,
+                pin_memory=True,
+                drop_last=True,
+                num_workers=4,
+                batch_size=self.batch_size,
+            )
         else:
             raise ValueError('Unsupported dataset : {}'.format(name))
 
@@ -248,7 +300,7 @@ class ResnetTrainer:
             for name, parameter in self.resnet.named_parameters():
                 if parameter.grad is not None:
                     avg_grad = torch.mean(parameter.grad)
-                    print('\tavg_grad for {} = {:.6f}'.format(name, avg_grad))
+                    # print('\tavg_grad for {} = {:.6f}'.format(name, avg_grad))
                     self.summary_writer.add_scalar(
                         'avg_grad/{}'.format(name), avg_grad.item(), self.total_steps)
                     self.summary_writer.add_histogram(
@@ -260,7 +312,7 @@ class ResnetTrainer:
                         'avg_weight/{}'.format(name), avg_weight.item(), self.total_steps)
                     self.summary_writer.add_histogram(
                         'weight/{}'.format(name), parameter.data.cpu().numpy(), self.total_steps)
-            print()
+        print()
 
     def save_checkpoint(self):
         model_path = os.path.join(
