@@ -27,7 +27,7 @@ class ResBlock(nn.Module):
         self.downsample_required = in_channels != out_channels
         if self.downsample_required:
             conv_layers = [
-                nn.Conv2d(in_channels, out_channels, 3, stride=2, padding=1), 
+                nn.Conv2d(in_channels, out_channels, 3, stride=2, padding=1),
                 nn.BatchNorm2d(out_channels),
                 nn.ReLU(inplace=True),
             ]
@@ -35,7 +35,7 @@ class ResBlock(nn.Module):
                 conv_layers.extend([
                     nn.Conv2d(out_channels, out_channels, 3, padding=1),
                     nn.BatchNorm2d(out_channels),
-                    nn.ReLU(inplace=True), 
+                    nn.ReLU(inplace=True),
                 ])
             conv_layers.extend([
                 nn.Conv2d(out_channels, out_channels, 3, padding=1),
@@ -52,7 +52,7 @@ class ResBlock(nn.Module):
                 conv_layers.extend([
                     nn.Conv2d(in_channels, out_channels, 3, padding=1),
                     nn.BatchNorm2d(out_channels),
-                    nn.ReLU(inplace=True), 
+                    nn.ReLU(inplace=True),
                 ])
             conv_layers.extend([
                 nn.Conv2d(out_channels, out_channels, 3, padding=1),
@@ -96,6 +96,33 @@ class ResNet32(nn.Module):
         x = self.avg_pool(self.res(x))
         x = x.view(-1, 64 * self.feature_dim * self.feature_dim)
         return self.fc(x)
+
+
+class ResNet44(nn.Module):
+    def __init__(self, num_classes: int, input_dim: int):
+        super().__init__()
+        # input size : (b x 3 x 32 x 32)
+        dim_shrink_rate = 1
+        self.conv_1 = nn.Conv2d(in_channels=3, out_channels=16, kernel_size=3, padding=1)  # (b x 16 x 32 x 32)
+        res1 = [ResBlock(16, 16) for _ in range(7)]  # (b x 16 x 32 x 32)
+        res2 = [ResBlock(16, 32)] + [ResBlock(32, 32) for _ in range(6)]  # (b x 32 x 16 x 16)
+        dim_shrink_rate *= 2
+        res3 = [ResBlock(32, 64)] + [ResBlock(64, 64) for _ in range(6)]  # (b x 64 x 8 x 8)
+        dim_shrink_rate *= 2
+
+        self.res = nn.Sequential(*(res1 + res2 + res3))
+        self.avg_pool = nn.AvgPool2d(kernel_size=2)  # (b x 64 x 4 x 4)
+        dim_shrink_rate *= 2
+        self.feature_dim = input_dim // dim_shrink_rate
+        self.fc = nn.Linear(64 * self.feature_dim * self.feature_dim, num_classes)
+        self.apply(init_weights)  # initielize weights for all submodules
+
+    def forward(self, x):
+        x = self.conv_1(x)
+        x = self.avg_pool(self.res(x))
+        x = x.view(-1, 64 * self.feature_dim * self.feature_dim)
+        return self.fc(x)
+
 
 class ResNet34(nn.Module):
     def __init__(self, num_classes: int, input_dim: int, mode='A'):

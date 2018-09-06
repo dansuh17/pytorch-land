@@ -1,7 +1,7 @@
 import os
 import math
 import random
-from model import ResNet34, ResNet32
+from model import ResNet34, ResNet32, ResNet44
 import torch
 from torch import optim, nn
 from torch.utils import data
@@ -11,7 +11,7 @@ from tensorboardX import SummaryWriter
 
 
 class ResnetTrainer:
-    def __init__(self, dataset_name='cifar100'):
+    def __init__(self, dataset_name='imagenet'):
         self.input_root_dir = 'resnet_data_in'
         self.output_root_dir = 'resnet_data_out'
         self.log_dir = os.path.join(self.output_root_dir, 'tblogs')
@@ -23,7 +23,7 @@ class ResnetTrainer:
         self.num_devices = 4
         self.batch_size = 256
         self.lr_init = 0.001
-        self.end_epoch = 200
+        self.end_epoch = 400
 
         self.dataset_name = dataset_name  # or 'cifar100' or 'imagenet'
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -36,7 +36,7 @@ class ResnetTrainer:
         self.validation_dataloader = None
         print('DataLoader created')
 
-        resnet = ResNet32(num_classes=self.num_classes, input_dim=self.image_dim).to(self.device)
+        resnet = ResNet34(num_classes=self.num_classes, input_dim=self.image_dim).to(self.device)
         self.resnet = torch.nn.parallel.DataParallel(resnet, device_ids=self.device_ids)
         print('Model created')
         print(self.resnet)
@@ -70,19 +70,55 @@ class ResnetTrainer:
             train_img_dir = os.path.join(self.input_root_dir, 'imagenet')
             num_classes = 1000
             image_dim = 224
-            dataset = datasets.ImageFolder(train_img_dir, transforms.Compose([
+            train_dataset = datasets.ImageFolder(train_img_dir, transforms.Compose([
                 transforms.RandomCrop(image_dim, padding=4),
                 transforms.RandomHorizontalFlip(),
                 transforms.ToTensor(),
                 normalize,
             ]))
-            dataset = datasets.ImageFolder(train_img_dir, transforms.Compose([
-                transforms.CenterCrop(image_dim, padding=4),
+            validate_dataset = datasets.ImageFolder(train_img_dir, transforms.Compose([
+                transforms.RandomCrop(image_dim, padding=4),
                 transforms.RandomHorizontalFlip(),
                 transforms.ToTensor(),
                 normalize,
             ]))
-            # TODO: split
+            test_dataset = datasets.ImageFolder(train_img_dir, transforms.Compose([
+                transforms.CenterCrop(image_dim),
+                transforms.ToTensor(),
+                normalize,
+            ]))
+            num_data = len(dataset)
+            indices = list(range(num_data))
+            num_train = math.floor(num_data * 0.8)
+            train_indices, valtest_indices = indices[:num_train], indices[num_train:]
+            num_validate = math.floor(num_data * 0.1)
+            validate_indices, test_indices = valtest_indices[:num_validate], valtest_indices[num_validate:]
+
+            # create data loaders out of datasets
+            train_dataloader = data.DataLoader(
+                train_dataset,
+                sampler=data.sampler.SubsetRandomSampler(train_indices),
+                pin_memory=True,
+                drop_last=True,
+                num_workers=4,
+                batch_size=self.batch_size,
+            )
+            validate_dataloader = data.DataLoader(
+                train_dataset,
+                sampler=data.sampler.SubsetRandomSampler(validate_indices),
+                pin_memory=True,
+                drop_last=True,
+                num_workers=4,
+                batch_size=self.batch_size,
+            )
+            test_dataloader = data.DataLoader(
+                test_dataset,
+                sampler=data.sampler.SubsetRandomSampler(test_indices),
+                pin_memory=True,
+                drop_last=True,
+                num_workers=4,
+                batch_size=self.batch_size,
+            )
         elif name == 'cifar10':
             normalize = transforms.Normalize(mean=[0.4914, 0.4822, 0.4465], std=[0.2023, 0.1994, 0.2010])
             train_img_dir = os.path.join(self.input_root_dir, 'cifar10')
