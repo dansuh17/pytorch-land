@@ -156,7 +156,6 @@ class ResNet34(nn.Module):
     def forward(self, x):
         x = self.maxpool(self.conv_1(x))
         x = self.avg_pool(self.res(x))
-        print(x.size())
         x = x.view(-1, 512 * 2 * 2)
         return self.fc(x)
 

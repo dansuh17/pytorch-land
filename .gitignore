@@ -12,3 +12,4 @@ run.sh
 train.sh
 user_dev_workspace/
 log.log
+vgg_imagenet.json

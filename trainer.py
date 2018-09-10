@@ -93,13 +93,15 @@ class ResnetTrainer:
                 transforms.ToTensor(),
                 normalize,
             ]))
-            num_data = len(dataset)
+            num_data = len(train_dataset)
+            print('Number of data points : {}'.format(num_data))
             indices = list(range(num_data))
             num_train = math.floor(num_data * 0.8)
             train_indices, valtest_indices = indices[:num_train], indices[num_train:]
             num_validate = math.floor(num_data * 0.1)
             validate_indices, test_indices = valtest_indices[:num_validate], valtest_indices[num_validate:]
 
+            print('{}, {}, {}'.format(num_train, len(validate_indices), len(test_indices)))
             # create data loaders out of datasets
             train_dataloader = data.DataLoader(
                 train_dataset,
@@ -273,6 +275,9 @@ class ResnetTrainer:
         Args:
             dataloader: loader for dataset.
             train (bool): True if performing parameter updates for the model
+
+        Returns:
+            (average_loss, average_accuracy)
         """
         losses = []
         accs = []
