@@ -112,7 +112,7 @@ class ResnetTrainer:
                 batch_size=self.batch_size,
             )
             validate_dataloader = data.DataLoader(
-                train_dataset,
+                validate_dataset,
                 sampler=data.sampler.SubsetRandomSampler(validate_indices),
                 pin_memory=True,
                 drop_last=True,
@@ -132,7 +132,7 @@ class ResnetTrainer:
             train_img_dir = os.path.join(self.input_root_dir, 'cifar10')
             num_classes = 10
             image_dim = 32
-            dataset = datasets.CIFAR10(
+            train_dataset = datasets.CIFAR10(
                 root=train_img_dir, train=True, download=True,
                 transform=transforms.Compose([
                     transforms.RandomCrop(image_dim, padding=4),
@@ -148,7 +148,7 @@ class ResnetTrainer:
                     transforms.ToTensor(),
                     normalize,
                 ]))
-            num_data = len(dataset)
+            num_data = len(train_dataset)
             indices = list(range(num_data))
             random.shuffle(indices)
             num_train = math.floor(num_data * 0.9)
@@ -156,7 +156,7 @@ class ResnetTrainer:
 
             # create data loaders out of datasets
             train_dataloader = data.DataLoader(
-                dataset,
+                train_dataset,
                 sampler=data.sampler.SubsetRandomSampler(train_idx),
                 pin_memory=True,
                 drop_last=True,
@@ -164,7 +164,7 @@ class ResnetTrainer:
                 batch_size=self.batch_size,
             )
             validate_dataloader = data.DataLoader(
-                dataset,
+                validate_dataset,
                 sampler=data.sampler.SubsetRandomSampler(validate_idx),
                 pin_memory=True,
                 drop_last=True,
@@ -172,14 +172,14 @@ class ResnetTrainer:
                 batch_size=self.batch_size,
             )
 
-            train_dataset = datasets.CIFAR10(
+            test_dataset = datasets.CIFAR10(
                 root=train_img_dir, train=False, download=True,
                 transform=transforms.Compose([
                     transforms.ToTensor(),
                     normalize,
                 ]))
             test_dataloader = data.DataLoader(
-                dataset,
+                test_dataset,
                 pin_memory=True,
                 drop_last=True,
                 num_workers=4,
