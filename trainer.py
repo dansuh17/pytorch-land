@@ -77,18 +77,19 @@ class ResnetTrainer:
             num_classes = 1000
             image_dim = 224
             train_dataset = datasets.ImageFolder(train_img_dir, transforms.Compose([
-                transforms.RandomCrop(image_dim, padding=4),
+                transforms.RandomResizedCrop(image_dim),  # randomly resize the image
                 transforms.RandomHorizontalFlip(),
                 transforms.ToTensor(),
                 normalize,
             ]))
             validate_dataset = datasets.ImageFolder(train_img_dir, transforms.Compose([
-                transforms.RandomCrop(image_dim, padding=4),
+                transforms.RandomResizedCrop(image_dim),
                 transforms.RandomHorizontalFlip(),
                 transforms.ToTensor(),
                 normalize,
             ]))
             test_dataset = datasets.ImageFolder(train_img_dir, transforms.Compose([
+                transforms.Resize(image_dim),  # do not adjust the aspect ratio, just resize the image
                 transforms.CenterCrop(image_dim),
                 transforms.ToTensor(),
                 normalize,
