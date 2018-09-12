@@ -249,8 +249,8 @@ class ResnetTrainer:
             raise ValueError('Unsupported dataset : {}'.format(name))
 
         # split the dataset into train / validate/ test sets
-        return train_dataloader, validate_dataloader, test_dataloader, num_classes, image_dim
         print('Dataset created')
+        return train_dataloader, validate_dataloader, test_dataloader, num_classes, image_dim
 
     def train(self):
         """
@@ -261,7 +261,10 @@ class ResnetTrainer:
             self.run_epoch(self.dataloader)
             self.save_checkpoint()
 
+            # validate step
             val_loss, _ = self.validate()
+
+            # update learning rates
             self.lr_scheduler.step(val_loss)
             self.save_learning_rate()
             self.epoch += 1
@@ -282,7 +285,6 @@ class ResnetTrainer:
         """
         losses = []
         accs = []
-        num_iters = len(dataloader.dataset)
         for imgs, targets in dataloader:
             imgs, targets = imgs.to(self.device), targets.to(self.device)
 
@@ -311,6 +313,9 @@ class ResnetTrainer:
                 accuracy = self.calc_batch_accuracy(output, targets)
                 accs.append(accuracy.item())
                 losses.append(loss.item())
+                # TODO: debugging message
+                print('[Debug] validation loss : {:.6f} acc : {:.6f}'
+                      .format(loss.item(), accuracy.item()))
 
         avg_loss = sum(losses) / len(losses)
         avg_acc = sum(accs) / len(accs)
@@ -328,6 +333,13 @@ class ResnetTrainer:
         return 0, 0
 
     def validate(self):
+        """
+        Validate the model using the validation set.
+
+        Returns:
+            val_loss: average loss during validation
+            val_acc: average accuracy during validation
+        """
         with torch.no_grad():
             val_loss, val_acc = self.run_epoch(self.validate_dataloader, train=False)
             self.save_performance_summary(val_loss, val_acc, summary_group='validate')
@@ -340,8 +352,8 @@ class ResnetTrainer:
         return accuracy
 
     def save_performance_summary(self, loss, accuracy, summary_group='train'):
-        print('Epoch: {}\tStep: {}\tLoss: {:.6f}\tAcc: {:.6f}'
-            .format(self.epoch, self.total_steps, loss, accuracy))
+        print('Epoch ({}): {}\tStep: {}\tLoss: {:.6f}\tAcc: {:.6f}'
+            .format(summary_group, self.epoch, self.total_steps, loss, accuracy))
         self.summary_writer.add_scalar(
             '{}/loss'.format(summary_group), loss, self.total_steps)
         self.summary_writer.add_scalar(
