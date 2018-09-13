@@ -4,12 +4,14 @@ import math
 import torch
 from torch import optim, nn
 from dataset import load_imagenet
+from base_trainer import NetworkTrainer
 from tensorboardX import SummaryWriter
 
 
-class ResnetTrainer:
+class ResnetTrainer(NetworkTrainer):
     """Trainer for model."""
     def __init__(self):
+        super().__init__()
         self.input_root_dir = 'resnet_data_in'
         self.output_root_dir = 'resnet_data_out'
         self.log_dir = os.path.join(self.output_root_dir, 'tblogs')
@@ -63,6 +65,26 @@ class ResnetTrainer:
         self.epoch, self.total_steps = self.set_train_status(resume=False)
         print('Starting from - Epoch : {}, Step : {}'.format(self.epoch, self.total_steps))
 
+    def set_train_status(self, resume: bool, checkpoint_path: str):
+        """
+        Args:
+            resume (bool): True if resuming previous training session
+            checkpoint_path (str): path to saved checkpoint
+
+        Returns:
+            epoch (int): train epoch number
+            total_steps (int): total iteration steps
+        """
+        if resume:
+            cpt = torch.load(checkpoint_path)
+            self.epoch = cpt['epoch']
+            self.total_steps = cpt['total_steps']
+            self.seed = cpt['seed']
+            self.resnet.load_state_dict(cpt['model'])
+            self.optimizer.load_state_dict(cpt['optimizer'])
+            return self.epoch, self.total_steps
+        return 0, 0
+
     def train(self):
         """The entire training session."""
         best_loss = math.inf
@@ -81,6 +103,9 @@ class ResnetTrainer:
             self.lr_scheduler.step(val_loss)
             self.save_learning_rate()
             self.epoch += 1
+        self.test()
+
+    def test(self):
         test_loss, test_acc = self.run_epoch(self.test_dataloader, train=False)
         print('Test set loss: {:.6f} acc: {:.4f}'.format(test_loss, test_acc))
 
@@ -133,26 +158,6 @@ class ResnetTrainer:
         avg_acc = sum(accs) / len(accs)
         return avg_loss, avg_acc
 
-    def set_train_status(self, resume: bool, checkpoint_path: str):
-        """
-        Args:
-            resume (bool): True if resuming previous training session
-            checkpoint_path (str): path to saved checkpoint
-
-        Returns:
-            epoch (int): train epoch number
-            total_steps (int): total iteration steps
-        """
-        if resume:
-            cpt = torch.load(checkpoint_path)
-            self.epoch = cpt['epoch']
-            self.total_steps = cpt['total_steps']
-            self.seed = cpt['seed']
-            self.resnet.load_state_dict(cpt['model'])
-            self.optimizer.load_state_dict(cpt['optimizer'])
-            return self.epoch, self.total_steps
-        return 0, 0
-
     def validate(self):
         """
         Validate the model using the validation set.
@@ -165,6 +170,26 @@ class ResnetTrainer:
             val_loss, val_acc = self.run_epoch(self.validate_dataloader, train=False)
             self.save_performance_summary(val_loss, val_acc, summary_group='validate')
         return val_loss, val_acc
+
+    def save_model(self, filename: str):
+        model_path = os.path.join(self.models_dir, filename)
+        torch.save(self.resnet, model_path)
+
+    def save_checkpoint(self, filename: str):
+        """Saves the model and training checkpoint.
+        The model only saves the model, and it is usually used for inference in the future.
+        The checkpoint saves the state dictionary of various modules
+        required for training. Usually this information is used to resume training.
+        """
+        checkpoint_path = os.path.join(self.models_dir, filename)
+        # save the model and related checkpoints
+        torch.save({
+            'epoch': self.epoch,
+            'total_steps': self.total_steps,
+            'seed': self.seed,
+            'model': self.resnet.state_dict(),
+            'optimizer': self.optimizer.state_dict(),
+        }, checkpoint_path)
 
     @staticmethod
     def calc_batch_accuracy(output, target):
@@ -205,26 +230,6 @@ class ResnetTrainer:
                     self.summary_writer.add_histogram(
                         'weight/{}'.format(name), parameter.data.cpu().numpy(), self.total_steps)
         print()
-
-    def save_model(self, filename: str):
-        model_path = os.path.join(self.models_dir, filename)
-        torch.save(self.resnet, model_path)
-
-    def save_checkpoint(self, filename: str):
-        """Saves the model and training checkpoint.
-        The model only saves the model, and it is usually used for inference in the future.
-        The checkpoint saves the state dictionary of various modules
-        required for training. Usually this information is used to resume training.
-        """
-        checkpoint_path = os.path.join(self.models_dir, filename)
-        # save the model and related checkpoints
-        torch.save({
-            'epoch': self.epoch,
-            'total_steps': self.total_steps,
-            'seed': self.seed,
-            'model': self.resnet.state_dict(),
-            'optimizer': self.optimizer.state_dict(),
-        }, checkpoint_path)
 
     def cleanup(self):
         self.summary_writer.close()
