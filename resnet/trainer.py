@@ -1,5 +1,5 @@
 import os
-from model import ResNet34, ResNet32, ResNet44
+from resnet.model import ResNet34
 import math
 import torch
 from torch import optim, nn
