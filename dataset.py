@@ -1,9 +1,75 @@
+"""
+Provides method of creating dataloaders of commonly used datasets.
+All methods should commonly return a tuple of 4:
+    1. train dataloader
+    2. validation dataloader
+    3. test dataloader
+    4. any miscellaneous information / data about the dataset in dict form (None if ... well, none)
+"""
 import os
 import math
 import random
 from torch.utils import data
 import torchvision.datasets as datasets
 import torchvision.transforms as transforms
+
+
+def load_mnist(data_root: str, batch_size: int):
+    """Creates loaders for MNIST dataset."""
+    train_img_dir = os.path.join(data_root, 'mnist')
+    num_classes = 10
+    mnist_transform = transforms.Compose([
+        transforms.Normalize((0.1307, ), (0.3081, )),
+        transforms.ToTensor(),
+    ])
+    train_dataset = datasets.MNIST(
+        root=train_img_dir,
+        train=True, download=True,
+        transform=mnist_transform)
+    validate_dataset = datasets.MNIST(
+        root=train_img_dir,
+        train=True, download=True,
+        transform=mnist_transform)
+
+    # split indices btwn. train and validation sets
+    num_data = len(train_dataset)
+    indices = list(range(num_data))
+    random.shuffle(indices)
+    num_train = math.floor(num_data * 0.9)
+    train_idx, validate_idx = indices[:num_train], indices[num_train:]
+
+    # create data loaders out of datasets
+    train_dataloader = data.DataLoader(
+        train_dataset,
+        sampler=data.sampler.SubsetRandomSampler(train_idx),
+        pin_memory=True,
+        drop_last=True,
+        num_workers=4,
+        batch_size=batch_size,
+    )
+    validate_dataloader = data.DataLoader(
+        validate_dataset,
+        sampler=data.sampler.SubsetRandomSampler(validate_idx),
+        pin_memory=True,
+        drop_last=True,
+        num_workers=4,
+        batch_size=batch_size,
+    )
+
+    # create test dataset
+    test_dataset = datasets.CIFAR10(
+        root=train_img_dir,
+        train=False, download=True,
+        transform=mnist_transform)
+    test_dataloader = data.DataLoader(
+        test_dataset,
+        pin_memory=True,
+        drop_last=True,
+        num_workers=4,
+        shuffle=True,
+        batch_size=batch_size,
+    )
+    return train_dataloader, validate_dataloader, test_dataloader, {'num_classes': num_classes, 'image_dim': 28}
 
 
 def load_imagenet(imagenet_dir: str, batch_size: int, image_dim=224):
@@ -125,6 +191,7 @@ def load_cifar10(data_root: str, batch_size: int, image_dim=32):
         test_dataset,
         pin_memory=True,
         drop_last=True,
+        shuffle=True,
         num_workers=4,
         batch_size=batch_size,
     )
@@ -190,6 +257,7 @@ def load_cifar100(data_root: str, batch_size: int, image_dim=32):
         pin_memory=True,
         drop_last=True,
         num_workers=4,
+        shuffle=True,
         batch_size=batch_size,
     )
     return train_dataloader, validate_dataloader, test_dataloader, {'num_classes': num_classes}

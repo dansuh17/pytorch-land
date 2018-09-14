@@ -27,7 +27,7 @@ class ResnetTrainer(NetworkTrainer):
         self.image_dim = 224
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self.device_ids = list([i for i in range(self.num_devices)])
+        self.device_ids = list(range(self.num_devices))
         self.seed = torch.initial_seed()
         print('Using seed : {}'.format(self.seed))
 

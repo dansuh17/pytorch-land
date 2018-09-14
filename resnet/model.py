@@ -160,8 +160,8 @@ class ResNet34(nn.Module):
         return self.fc(x)
 
 
-
 if __name__ == '__main__':
+    # Testing the model with arbitrary input
     residual = ResBlock(128, 256, convs=2)
     print(residual)
     samp = torch.randn((10, 128, 28, 28))
