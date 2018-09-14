@@ -7,6 +7,7 @@ from itertools import islice
 import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader, sampler
+import torchvision.transforms as transforms
 
 
 TRAIN_IMG_URL = 'http://yann.lecun.com/exdb/mnist/train-images-idx3-ubyte.gz'
@@ -110,7 +111,11 @@ class NoisyMnistDataset(Dataset):
                                      size=self.image_size,
                                      p=[self.zero_prob, 1 - self.zero_prob])
         img_corrupted = img * zero_mask
-        return torch.FloatTensor(img), torch.FloatTensor(img_corrupted)
+        transform = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize((0.1307, ), (0.3081, )),
+        ])
+        return transform(torch.FloatTensor(img)), transform(torch.FloatTensor(img_corrupted))
 
     def __len__(self):
         return len(self.train_data)
