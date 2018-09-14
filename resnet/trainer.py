@@ -150,9 +150,6 @@ class ResnetTrainer(NetworkTrainer):
                 accuracy = self.calc_batch_accuracy(output, targets)
                 accs.append(accuracy.item())
                 losses.append(loss.item())
-                # TODO: debugging message
-                print('[Debug] validation loss : {:.6f} acc : {:.6f}'
-                      .format(loss.item(), accuracy.item()))
 
         avg_loss = sum(losses) / len(losses)
         avg_acc = sum(accs) / len(accs)
