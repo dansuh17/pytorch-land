@@ -5,7 +5,7 @@ import gzip
 import urllib.request
 from itertools import islice
 import numpy as np
-import torch
+from PIL import Image
 from torch.utils.data import Dataset, DataLoader, sampler
 import torchvision.transforms as transforms
 
@@ -105,17 +105,24 @@ class NoisyMnistDataset(Dataset):
         self.train_label = list(map(int, train_label_bytes))
 
     def __getitem__(self, idx):
-        # TODO: image transform
-        img = np.asarray(self.train_data[idx])
-        zero_mask = np.random.choice([0, 1],
-                                     size=self.image_size,
-                                     p=[self.zero_prob, 1 - self.zero_prob])
+        img = np.asarray(self.train_data[idx], dtype=np.uint8)
+        zero_mask = np.random.choice(
+            [0, 1],
+            size=self.image_size,
+            p=[self.zero_prob, 1 - self.zero_prob]).astype(np.uint8)
         img_corrupted = img * zero_mask
+
+        img = img.reshape((28, 28))
+        img = Image.fromarray(img, mode='L')
+
+        img_corrupted = img_corrupted.reshape((28, 28))
+        img_corrupted = Image.fromarray(img_corrupted, mode='L')
+
         transform = transforms.Compose([
             transforms.ToTensor(),
             transforms.Normalize((0.1307, ), (0.3081, )),
         ])
-        return transform(torch.FloatTensor(img)), transform(torch.FloatTensor(img_corrupted))
+        return transform(img).view(784), transform(img_corrupted).view(784)
 
     def __len__(self):
         return len(self.train_data)
@@ -123,4 +130,5 @@ class NoisyMnistDataset(Dataset):
 
 if __name__ == '__main__':
     dataset = NoisyMnistDataset(data_root='./denoising_autoencoder/mnist')
-    print(dataset[1])
+    c, o = dataset[1]
+    print(c.shape)

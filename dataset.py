@@ -19,8 +19,8 @@ def load_mnist(data_root: str, batch_size: int):
     train_img_dir = os.path.join(data_root, 'mnist')
     num_classes = 10
     mnist_transform = transforms.Compose([
-        transforms.Normalize((0.1307, ), (0.3081, )),
         transforms.ToTensor(),
+        transforms.Normalize((0.1307, ), (0.3081, )),
     ])
     train_dataset = datasets.MNIST(
         root=train_img_dir,

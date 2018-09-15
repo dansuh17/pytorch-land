@@ -2,6 +2,7 @@ import os
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import torchvision.utils
 from base_trainer import NetworkTrainer
 from .model import SDAE
 from .noisy_dataset import load_noisy_mnist_dataloader
@@ -96,6 +97,12 @@ class SDAETrainer(NetworkTrainer):
                 self.total_steps += 1
             else:  # validation / test epoch
                 losses.append(loss.item())
+                grid_input = torchvision.utils.make_grid(cimg[:4, :].view(-1, 1, 28, 28), nrow=4, normalize=True)
+                grid_output = torchvision.utils.make_grid(out[:4, :].view(-1, 1, 28, 28), nrow=4, normalize=True)
+                self.summ_writer.add_image(
+                    '{}/input'.format(self.epoch), grid_input, self.total_steps)
+                self.summ_writer.add_image(
+                    '{}/output'.format(self.epoch), grid_output, self.total_steps)
 
         avg_loss = sum(losses) / len(losses)
         return avg_loss
@@ -126,7 +133,7 @@ class SDAETrainer(NetworkTrainer):
             val_loss = self.run_epoch(self.val_dataloader, train=False)
             print('Epoch (validate): {:03}  Step: {:06}  Loss: {:.06f}'
                   .format(self.epoch, self.total_steps, val_loss))
-            self.summ_writer.add_scalar('validate/loss', val_loss)
+            self.summ_writer.add_scalar('validate/loss', val_loss, self.total_steps)
         return val_loss
 
     def save_model(self, filename: str):
