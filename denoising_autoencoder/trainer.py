@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torchvision.utils
+import torch.onnx
 from base_trainer import NetworkTrainer
 from .model import SDAE
 from .noisy_dataset import load_noisy_mnist_dataloader
@@ -24,7 +25,7 @@ class SDAETrainer(NetworkTrainer):
         self.batch_size = 128
         self.num_devices = 4
         self.lr_init = 0.001
-        self.end_epoch = 200
+        self.end_epoch = 400
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.device_ids = list(range(self.num_devices))
         self.seed = torch.initial_seed()
@@ -32,10 +33,10 @@ class SDAETrainer(NetworkTrainer):
 
         self.train_dataloader, self.val_dataloader, self.test_dataloader = \
             load_noisy_mnist_dataloader(self.batch_size)
-        self.image_dim = 28
+        self.input_dim = 28 * 28
         print('Dataloader created')
 
-        sdae = SDAE(input_dim=self.image_dim * self.image_dim).to(self.device)
+        sdae = SDAE(input_dim=self.input_dim).to(self.device)
         self.sdae = torch.nn.parallel.DataParallel(sdae, device_ids=self.device_ids)
         print('Model created')
         print(self.sdae)
@@ -50,7 +51,7 @@ class SDAETrainer(NetworkTrainer):
         print('Criterion : {}'.format(self.criterion))
 
         self.lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-            self.optimizer, mode='min', verbose=True, factor=0.1)
+            self.optimizer, mode='min', verbose=True, factor=0.2, patience=7)
         print('LR scheduler created')
 
         self.epoch = 0
@@ -136,9 +137,15 @@ class SDAETrainer(NetworkTrainer):
             self.summ_writer.add_scalar('validate/loss', val_loss, self.total_steps)
         return val_loss
 
-    def save_model(self, filename: str):
-        model_path = os.path.join(self.models_dir, filename)
-        torch.save(self.sdae, model_path)
+    def save_model(self, filename: str, onnx=True):
+        if onnx:
+            dummy_input = torch.randn((10, 1, self.input_dim))
+            # TODO: set input / output names?
+            torch.onnx.export(self.sdae, dummy_input, 'sdae.onnx', verbose=True)
+            # TODO: check onnx validity
+        else:
+            model_path = os.path.join(self.models_dir, filename)
+            torch.save(self.sdae, model_path)
 
     def save_checkpoint(self, filename: str):
         checkpoint_path = os.path.join(self.models_dir, filename)
@@ -155,6 +162,7 @@ class SDAETrainer(NetworkTrainer):
 
 
 if __name__ == '__main__':
+    # completely train mnist to stacked denoising autoencoder and cleanup afterwards
     trainer = SDAETrainer()
     trainer.train()
     trainer.cleanup()

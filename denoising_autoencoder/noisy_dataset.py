@@ -22,10 +22,10 @@ def to_displayable_form(img_tensor):
 
 def load_noisy_mnist_dataloader(batch_size: int):
     data_root = './denoising_autoencoder/mnist'
-    train_dataset = NoisyMnistDataset(data_root, train=True, zero_prob=0.25)
+    train_dataset = NoisyMnistDataset(data_root, train=True, zero_prob=0.40)
     # train=True because validation set is split from training dataset
-    validate_dataset = NoisyMnistDataset(data_root, train=True, zero_prob=0.25)
-    test_dataset = NoisyMnistDataset(data_root, train=False, zero_prob=0.30)
+    validate_dataset = NoisyMnistDataset(data_root, train=True, zero_prob=0.40)
+    test_dataset = NoisyMnistDataset(data_root, train=False, zero_prob=0.50)
 
     num_data = len(train_dataset)
     indices = list(range(num_data))
