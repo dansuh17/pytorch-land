@@ -156,7 +156,7 @@ class SDAETrainer(NetworkTrainer):
         model_path = os.path.join(self.models_dir, filename)
         if save_onnx:
             # TODO: set input / output names?
-            dummy_input = torch.randn((10, 1, self.input_dim))
+            dummy_input = torch.randn((10, 1, self.input_dim)).to(self.device)
             # cannot export DataParallel-wrapped module
             torch.onnx.export(self.sdae.module, dummy_input, model_path, verbose=True)
             # check validity of onnx IR and print the graph
