@@ -13,7 +13,7 @@ from tensorboardX import SummaryWriter
 
 
 class SDAETrainer(NetworkTrainer):
-    """Stacked Denoising Auto-Encoder"""
+    """Trainer for Stacked Denoising Auto-Encoder"""
     def __init__(self):
         super().__init__()
         self.input_root_dir = 'sdae_data_in'
@@ -61,6 +61,7 @@ class SDAETrainer(NetworkTrainer):
         print('Starting from - epoch : {}, step: {}'.format(self.epoch, self.total_steps))
 
     def train(self):
+        """The entire training session."""
         best_loss = math.inf
         for _ in range(self.epoch, self.end_epoch):
             self.summ_writer.add_scalar('epoch', self.epoch, self.total_steps)
@@ -80,6 +81,9 @@ class SDAETrainer(NetworkTrainer):
         self.test()
 
     def run_epoch(self, dataloader, train=True):
+        """Run a single epoch of provided dataloader.
+        No parameters are updated if train=False.
+        """
         losses = []
         for oimg, cimg in dataloader:  # original images / corrupted images pairs
             oimg, cimg = oimg.to(self.device), cimg.to(self.device)
@@ -135,10 +139,12 @@ class SDAETrainer(NetworkTrainer):
                         'weight/{}'.format(name), parameter.data.cpu().numpy(), self.total_steps)
 
     def test(self):
+        """Test with test dataset."""
         test_loss = self.run_epoch(self.test_dataloader, train=False)
         print('Test set loss: {:.6f}'.format(test_loss))
 
     def validate(self):
+        """Validation step."""
         with torch.no_grad():
             val_loss = self.run_epoch(self.val_dataloader, train=False)
             print('Epoch (validate): {:03}  Step: {:06}  Loss: {:.06f}'
@@ -149,9 +155,10 @@ class SDAETrainer(NetworkTrainer):
     def save_model(self, filename: str, save_onnx=False):
         model_path = os.path.join(self.models_dir, filename)
         if save_onnx:
-            dummy_input = torch.randn((10, 1, self.input_dim))
             # TODO: set input / output names?
-            torch.onnx.export(self.sdae, dummy_input, model_path, verbose=True)
+            dummy_input = torch.randn((10, 1, self.input_dim))
+            # cannot export DataParallel-wrapped module
+            torch.onnx.export(self.sdae.module, dummy_input, model_path, verbose=True)
             # check validity of onnx IR and print the graph
             model = onnx.load(model_path)
             onnx.checker.check_model(model)

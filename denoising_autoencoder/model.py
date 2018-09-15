@@ -2,8 +2,11 @@ from torch import nn
 
 
 class SDAE(nn.Module):
-    """3-layer stacked denoising autoencoder (denoted by SdA-3 in the literature),
+    """A simple 3-layer stacked denoising autoencoder (denoted "SdA-3" in the literature),
     proposed by Vincent et al. (2008).
+
+    This implementation assumes training with MNIST dataset only.
+    (See `noisy_dataset.NoisyMnistDataset` about how dataset looks like.)
     """
     def __init__(self, input_dim):
         super().__init__()

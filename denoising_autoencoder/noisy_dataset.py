@@ -21,6 +21,7 @@ def to_displayable_form(img_tensor):
 
 
 def load_noisy_mnist_dataloader(batch_size: int):
+    """Creates dataloaders with this noisy MNIST dataset."""
     data_root = './denoising_autoencoder/mnist'
     train_dataset = NoisyMnistDataset(data_root, train=True, zero_prob=0.40)
     # train=True because validation set is split from training dataset
@@ -60,6 +61,11 @@ def load_noisy_mnist_dataloader(batch_size: int):
 
 
 class NoisyMnistDataset(Dataset):
+    """MNIST dataset that produces pairs of images: the original 28 by 28 image
+    and the same image corrupted by setting pixels to 0 with probability `zero_prob`.
+
+    This is used to train a denoising autoencoder, so no class label is required.
+    """
     def __init__(self, data_root: str, train=True, zero_prob=0.25):
         super().__init__()
         self.zero_prob = zero_prob
@@ -107,13 +113,13 @@ class NoisyMnistDataset(Dataset):
     def __getitem__(self, idx):
         img = np.asarray(self.train_data[idx], dtype=np.uint8)
         zero_mask = np.random.choice(
-            [0, 1],
+            [0, 1],  # choose from either 0 or 1
             size=self.image_size,
             p=[self.zero_prob, 1 - self.zero_prob]).astype(np.uint8)
         img_corrupted = img * zero_mask
 
         img = img.reshape((28, 28))
-        img = Image.fromarray(img, mode='L')
+        img = Image.fromarray(img, mode='L')  # mode 'L' = the array contains 0 - 255 integer values
 
         img_corrupted = img_corrupted.reshape((28, 28))
         img_corrupted = Image.fromarray(img_corrupted, mode='L')
