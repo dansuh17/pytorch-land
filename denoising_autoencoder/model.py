@@ -22,8 +22,16 @@ class SDAE(nn.Module):
             nn.SELU(inplace=True),
             nn.Linear(400, input_dim),
         )
+        self.init_weights(self)
 
     def forward(self, x):
         x = self.encoder(x)
         x = self.decoder(x)
         return x
+
+    @staticmethod
+    def init_weights(m):
+        if isinstance(m, nn.Linear):
+            # use kaiming due to the use of SELU nonlinearity
+            nn.init.kaiming_normal_(m.weight)
+            nn.init.constant_(m.bias, 0)

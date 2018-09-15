@@ -1,9 +1,11 @@
+import math
 import os
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import torchvision.utils
 import torch.onnx
+import onnx
 from base_trainer import NetworkTrainer
 from .model import SDAE
 from .noisy_dataset import load_noisy_mnist_dataloader
@@ -47,7 +49,7 @@ class SDAETrainer(NetworkTrainer):
         self.summ_writer = SummaryWriter(log_dir=self.log_dir)
         print('Summary Writer created')
 
-        self.criterion = nn.MSELoss(reduction='elementwise_mean')
+        self.criterion = nn.MSELoss()
         print('Criterion : {}'.format(self.criterion))
 
         self.lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(
@@ -59,10 +61,16 @@ class SDAETrainer(NetworkTrainer):
         print('Starting from - epoch : {}, step: {}'.format(self.epoch, self.total_steps))
 
     def train(self):
+        best_loss = math.inf
         for _ in range(self.epoch, self.end_epoch):
             self.summ_writer.add_scalar('epoch', self.epoch, self.total_steps)
             # train
             train_loss = self.run_epoch(self.train_dataloader, train=True)
+
+            # save the best model
+            if best_loss > train_loss:
+                best_loss = train_loss
+                self.save_model('sdae.onnx', save_onnx=True)
 
             # validate
             val_loss = self.validate()
@@ -93,6 +101,7 @@ class SDAETrainer(NetworkTrainer):
                     self.summ_writer.add_scalar('train/loss', loss_val, self.total_steps)
 
                 if self.total_steps % 100 == 0:
+                    self.save_model('sdae_model_e{}.pth'.format(self.epoch))
                     self.save_model_summary()
 
                 self.total_steps += 1
@@ -137,14 +146,17 @@ class SDAETrainer(NetworkTrainer):
             self.summ_writer.add_scalar('validate/loss', val_loss, self.total_steps)
         return val_loss
 
-    def save_model(self, filename: str, onnx=True):
-        if onnx:
+    def save_model(self, filename: str, save_onnx=False):
+        model_path = os.path.join(self.models_dir, filename)
+        if save_onnx:
             dummy_input = torch.randn((10, 1, self.input_dim))
             # TODO: set input / output names?
-            torch.onnx.export(self.sdae, dummy_input, 'sdae.onnx', verbose=True)
-            # TODO: check onnx validity
+            torch.onnx.export(self.sdae, dummy_input, model_path, verbose=True)
+            # check validity of onnx IR and print the graph
+            model = onnx.load(model_path)
+            onnx.checker.check_model(model)
+            onnx.helper.printable_graph(model.graph)
         else:
-            model_path = os.path.join(self.models_dir, filename)
             torch.save(self.sdae, model_path)
 
     def save_checkpoint(self, filename: str):
