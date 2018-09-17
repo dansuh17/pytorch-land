@@ -4,10 +4,8 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torchvision.utils
-import torch.onnx
-import onnx
 from base_trainer import NetworkTrainer
-from .model import SDAE
+from .scdae import SDAE
 from .noisy_dataset import load_noisy_mnist_dataloader
 from tensorboardX import SummaryWriter
 
@@ -20,6 +18,7 @@ class SDAETrainer(NetworkTrainer):
         self.output_root_dir = 'sdae_data_out'
         self.log_dir = os.path.join(self.output_root_dir, 'tblogs')
         self.models_dir = os.path.join(self.output_root_dir, 'models')
+
         # create directories
         os.makedirs(self.log_dir, exist_ok=True)
         os.makedirs(self.models_dir, exist_ok=True)
@@ -28,10 +27,7 @@ class SDAETrainer(NetworkTrainer):
         self.num_devices = 4
         self.lr_init = 0.001
         self.end_epoch = 400
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.device_ids = list(range(self.num_devices))
-        self.seed = torch.initial_seed()
-        print('Using random seed : {}'.format(self.seed))
 
         self.train_dataloader, self.val_dataloader, self.test_dataloader = \
             load_noisy_mnist_dataloader(self.batch_size)
@@ -65,13 +61,16 @@ class SDAETrainer(NetworkTrainer):
         best_loss = math.inf
         for _ in range(self.epoch, self.end_epoch):
             self.summ_writer.add_scalar('epoch', self.epoch, self.total_steps)
+
             # train
             train_loss = self.run_epoch(self.train_dataloader, train=True)
 
-            # save the best model
             if best_loss > train_loss:
                 best_loss = train_loss
-                self.save_model('sdae.onnx', save_onnx=True)
+                # save best model in onnx format
+                dummy_input = torch.randn((10, 1, self.input_dim)).to(self.device)
+                self.save_module(self.sdae.module, os.path.join(self.models_dir, 'sdae.onnx'),
+                                 save_onnx=True, dummy_input=dummy_input)
 
             # validate
             val_loss = self.validate()
@@ -96,21 +95,23 @@ class SDAETrainer(NetworkTrainer):
                 loss.backward()
                 self.optimizer.step()
 
-                if self.total_steps % 10 == 0:
+                if self.total_steps % 10 == 0:  # save performance metrics
                     loss_val = loss.item()
                     losses.append(loss_val)
-                    # save performance summary
-                    print('Epoch (train): {:03}  Step: {:06}  Loss: {:.6f}'
-                          .format(self.epoch, self.total_steps, loss_val))
-                    self.summ_writer.add_scalar('train/loss', loss_val, self.total_steps)
+                    self.log_performance(
+                        self.summ_writer, {'loss': loss_val}, self.epoch, self.total_steps)
 
-                if self.total_steps % 100 == 0:
-                    self.save_model('sdae_model_e{}.pth'.format(self.epoch))
-                    self.save_model_summary()
+                if self.total_steps % 500 == 0:  # save models and their info
+                    # save the module in onnx format
+                    self.save_module(
+                        self.sdae.module, os.path.join(self.models_dir, 'sdae_model_e{}.pth'.format(self.epoch)))
+                    self.save_module_summary(
+                        self.summ_writer, self.sdae, self.total_steps, save_histogram=False)
 
                 self.total_steps += 1
             else:  # validation / test epoch
                 losses.append(loss.item())
+                # save example images
                 grid_input = torchvision.utils.make_grid(cimg[:4, :].view(-1, 1, 28, 28), nrow=4, normalize=True)
                 grid_output = torchvision.utils.make_grid(out[:4, :].view(-1, 1, 28, 28), nrow=4, normalize=True)
                 self.summ_writer.add_image(
@@ -120,23 +121,6 @@ class SDAETrainer(NetworkTrainer):
 
         avg_loss = sum(losses) / len(losses)
         return avg_loss
-
-    def save_model_summary(self):
-        with torch.no_grad():
-            for name, parameter in self.sdae.named_parameters():
-                if parameter.grad is not None:
-                    avg_grad = torch.mean(parameter.grad)
-                    self.summ_writer.add_scalar(
-                        'avg_grad/{}'.format(name), avg_grad.item(), self.total_steps)
-                    self.summ_writer.add_histogram(
-                        'grad/{}'.format(name), parameter.grad.cpu().numpy(), self.total_steps)
-
-                if parameter.data is not None:
-                    avg_weight = torch.mean(parameter.data)
-                    self.summ_writer.add_scalar(
-                        'avg_weight/{}'.format(name), avg_weight.item(), self.total_steps)
-                    self.summ_writer.add_histogram(
-                        'weight/{}'.format(name), parameter.data.cpu().numpy(), self.total_steps)
 
     def test(self):
         """Test with test dataset."""
@@ -151,20 +135,6 @@ class SDAETrainer(NetworkTrainer):
                   .format(self.epoch, self.total_steps, val_loss))
             self.summ_writer.add_scalar('validate/loss', val_loss, self.total_steps)
         return val_loss
-
-    def save_model(self, filename: str, save_onnx=False):
-        model_path = os.path.join(self.models_dir, filename)
-        if save_onnx:
-            # TODO: set input / output names?
-            dummy_input = torch.randn((10, 1, self.input_dim)).to(self.device)
-            # cannot export DataParallel-wrapped module
-            torch.onnx.export(self.sdae.module, dummy_input, model_path, verbose=True)
-            # check validity of onnx IR and print the graph
-            model = onnx.load(model_path)
-            onnx.checker.check_model(model)
-            onnx.helper.printable_graph(model.graph)
-        else:
-            torch.save(self.sdae, model_path)
 
     def save_checkpoint(self, filename: str):
         checkpoint_path = os.path.join(self.models_dir, filename)
