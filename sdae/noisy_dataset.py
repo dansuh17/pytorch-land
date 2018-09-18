@@ -8,6 +8,7 @@ import numpy as np
 from PIL import Image
 from torch.utils.data import Dataset, DataLoader, sampler
 import torchvision.transforms as transforms
+from utils.noise import zero_mask_noise
 
 
 TRAIN_IMG_URL = 'http://yann.lecun.com/exdb/mnist/train-images-idx3-ubyte.gz'
@@ -22,7 +23,7 @@ def to_displayable_form(img_tensor):
 
 def load_noisy_mnist_dataloader(batch_size: int):
     """Creates dataloaders with this noisy MNIST dataset."""
-    data_root = './denoising_autoencoder/mnist'
+    data_root = './sdae/mnist'
     train_dataset = NoisyMnistDataset(data_root, train=True, zero_prob=0.40)
     # train=True because validation set is split from training dataset
     validate_dataset = NoisyMnistDataset(data_root, train=True, zero_prob=0.40)
@@ -112,11 +113,8 @@ class NoisyMnistDataset(Dataset):
 
     def __getitem__(self, idx):
         img = np.asarray(self.train_data[idx], dtype=np.uint8)
-        zero_mask = np.random.choice(
-            [0, 1],  # choose from either 0 or 1
-            size=self.image_size,
-            p=[self.zero_prob, 1 - self.zero_prob]).astype(np.uint8)
-        img_corrupted = img * zero_mask
+        # corrupt with zero mask noise
+        img_corrupted = zero_mask_noise(img, zero_prob=self.zero_prob, dtype=np.uint8)
 
         img = img.reshape((28, 28))
         img = Image.fromarray(img, mode='L')  # mode 'L' = the array contains 0 - 255 integer values
@@ -128,13 +126,13 @@ class NoisyMnistDataset(Dataset):
             transforms.ToTensor(),
             transforms.Normalize((0.1307, ), (0.3081, )),
         ])
-        return transform(img).view(784), transform(img_corrupted).view(784)
+        return transform(img).view(self.image_size), transform(img_corrupted).view(self.image_size)
 
     def __len__(self):
         return len(self.train_data)
 
 
 if __name__ == '__main__':
-    dataset = NoisyMnistDataset(data_root='./denoising_autoencoder/mnist')
+    dataset = NoisyMnistDataset(data_root='./sdae/mnist')
     c, o = dataset[1]
     print(c.shape)
