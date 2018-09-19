@@ -57,7 +57,7 @@ class NetworkTrainer:
         for metric_name, val in metrics.items():
             log += '{}: {:.06f}\t'.format(metric_name, val)
             # write to summary writer
-            writer.add_scalar('{}/{}'.format(summary_group, val), val, step)
+            writer.add_scalar('{}/{}'.format(summary_group, metric_name), val, step)
         print(log)
 
     @staticmethod
