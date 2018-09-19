@@ -101,8 +101,9 @@ class SchimdtSDATrainer(NetworkTrainer):
                 self.step += 1
             else:  # validation
                 losses.append(loss.item())
-                grid_input = torchvision.utils.make_grid(clean_img[:4, :], nrow=4, normalize=True)
-                grid_output = torchvision.utils.make_grid(noisy_img[:4, :], nrow=4, normalize=True)
+                # print 4 images in a row
+                grid_input = torchvision.utils.make_grid(noisy_img[:4, :], nrow=4, normalize=True)
+                grid_output = torchvision.utils.make_grid(output[:4, :], nrow=4, normalize=True)
                 self.writer.add_image(
                     '{}/input'.format(self.epoch), grid_input, self.step)
                 self.writer.add_image(
