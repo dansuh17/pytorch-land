@@ -21,13 +21,13 @@ def to_displayable_form(img_tensor):
     return img_tensor.numpy().astype(np.uint8).resize((28, 28))
 
 
-def load_noisy_mnist_dataloader(batch_size: int):
+def load_noisy_mnist_dataloader(batch_size: int, img_shape: tuple=None):
     """Creates dataloaders with this noisy MNIST dataset."""
     data_root = './sdae/mnist'
-    train_dataset = NoisyMnistDataset(data_root, train=True, zero_prob=0.40)
+    train_dataset = NoisyMnistDataset(data_root, img_shape, train=True, zero_prob=0.40)
     # train=True because validation set is split from training dataset
-    validate_dataset = NoisyMnistDataset(data_root, train=True, zero_prob=0.40)
-    test_dataset = NoisyMnistDataset(data_root, train=False, zero_prob=0.50)
+    validate_dataset = NoisyMnistDataset(data_root, img_shape, train=True, zero_prob=0.40)
+    test_dataset = NoisyMnistDataset(data_root, img_shape, train=False, zero_prob=0.50)
 
     num_data = len(train_dataset)
     indices = list(range(num_data))
@@ -67,9 +67,13 @@ class NoisyMnistDataset(Dataset):
 
     This is used to train a denoising autoencoder, so no class label is required.
     """
-    def __init__(self, data_root: str, train=True, zero_prob=0.25):
+    def __init__(self, data_root: str, img_shape: tuple=None, train=True, zero_prob=0.25):
         super().__init__()
         self.zero_prob = zero_prob
+        if img_shape is not None:
+            self.img_shape = img_shape
+        else:
+            self.img_shape = (1, 28, 28)
         self.image_size = 784
 
         # create data input path
@@ -126,7 +130,7 @@ class NoisyMnistDataset(Dataset):
             transforms.ToTensor(),
             transforms.Normalize((0.1307, ), (0.3081, )),
         ])
-        return transform(img).view(self.image_size), transform(img_corrupted).view(self.image_size)
+        return transform(img).view(*self.img_shape), transform(img_corrupted).view(*self.img_shape)
 
     def __len__(self):
         return len(self.train_data)

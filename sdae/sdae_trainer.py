@@ -6,7 +6,7 @@ import torch.optim as optim
 import torchvision.utils
 from base_trainer import NetworkTrainer
 from .sdae import SDAE
-from .noisy_dataset import load_noisy_mnist_dataloader
+from datasets.noisy_dataset import load_noisy_mnist_dataloader
 from tensorboardX import SummaryWriter
 
 
@@ -29,9 +29,10 @@ class SDAETrainer(NetworkTrainer):
         self.end_epoch = 400
         self.device_ids = list(range(self.num_devices))
 
-        self.train_dataloader, self.val_dataloader, self.test_dataloader = \
-            load_noisy_mnist_dataloader(self.batch_size)
         self.input_dim = 28 * 28
+        self.input_shape = (self.input_dim, )
+        self.train_dataloader, self.val_dataloader, self.test_dataloader = \
+            load_noisy_mnist_dataloader(self.batch_size, self.input_shape)
         print('Dataloader created')
 
         sdae = SDAE(input_dim=self.input_dim).to(self.device)
@@ -53,14 +54,14 @@ class SDAETrainer(NetworkTrainer):
         print('LR scheduler created')
 
         self.epoch = 0
-        self.total_steps = 0
-        print('Starting from - epoch : {}, step: {}'.format(self.epoch, self.total_steps))
+        self.step = 0
+        print('Starting from - epoch : {}, step: {}'.format(self.epoch, self.step))
 
     def train(self):
         """The entire training session."""
         best_loss = math.inf
         for _ in range(self.epoch, self.end_epoch):
-            self.summ_writer.add_scalar('epoch', self.epoch, self.total_steps)
+            self.summ_writer.add_scalar('epoch', self.epoch, self.step)
 
             # train
             train_loss = self.run_epoch(self.train_dataloader, train=True)
@@ -95,29 +96,29 @@ class SDAETrainer(NetworkTrainer):
                 loss.backward()
                 self.optimizer.step()
 
-                if self.total_steps % 10 == 0:  # save performance metrics
+                if self.step % 10 == 0:  # save performance metrics
                     loss_val = loss.item()
                     losses.append(loss_val)
                     self.log_performance(
-                        self.summ_writer, {'loss': loss_val}, self.epoch, self.total_steps)
+                        self.summ_writer, {'loss': loss_val}, self.epoch, self.step)
 
-                if self.total_steps % 500 == 0:  # save models and their info
+                if self.step % 500 == 0:  # save models and their info
                     # save the module in onnx format
                     self.save_module(
                         self.sdae.module, os.path.join(self.models_dir, 'sdae_model_e{}.pth'.format(self.epoch)))
                     self.save_module_summary(
-                        self.summ_writer, self.sdae, self.total_steps, save_histogram=False)
+                        self.summ_writer, self.sdae, self.step, save_histogram=False)
 
-                self.total_steps += 1
+                self.step += 1
             else:  # validation / test epoch
                 losses.append(loss.item())
                 # save example images
                 grid_input = torchvision.utils.make_grid(cimg[:4, :].view(-1, 1, 28, 28), nrow=4, normalize=True)
                 grid_output = torchvision.utils.make_grid(out[:4, :].view(-1, 1, 28, 28), nrow=4, normalize=True)
                 self.summ_writer.add_image(
-                    '{}/input'.format(self.epoch), grid_input, self.total_steps)
+                    '{}/input'.format(self.epoch), grid_input, self.step)
                 self.summ_writer.add_image(
-                    '{}/output'.format(self.epoch), grid_output, self.total_steps)
+                    '{}/output'.format(self.epoch), grid_output, self.step)
 
         avg_loss = sum(losses) / len(losses)
         return avg_loss
@@ -132,15 +133,15 @@ class SDAETrainer(NetworkTrainer):
         with torch.no_grad():
             val_loss = self.run_epoch(self.val_dataloader, train=False)
             print('Epoch (validate): {:03}  Step: {:06}  Loss: {:.06f}'
-                  .format(self.epoch, self.total_steps, val_loss))
-            self.summ_writer.add_scalar('validate/loss', val_loss, self.total_steps)
+                  .format(self.epoch, self.step, val_loss))
+            self.summ_writer.add_scalar('validate/loss', val_loss, self.step)
         return val_loss
 
     def save_checkpoint(self, filename: str):
         checkpoint_path = os.path.join(self.models_dir, filename)
         torch.save({
             'epoch': self.epoch,
-            'total_steps': self.total_steps,
+            'step': self.step,
             'seed': self.seed,
             'model': self.sdae.state_dict(),
             'optimizer': self.optimizer.state_dict(),

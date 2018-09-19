@@ -1,0 +1,10 @@
+{
+  "input_root_dir": "schmidt_sda_data_in",
+  "output_root_dir": "schmidt_sda_data_out",
+  "log_dir": "tblogs",
+  "model_dir": "models",
+  "batch_size": 128,
+  "num_devices": 4,
+  "epoch": 400,
+  "lr_init": 0.001
+}
