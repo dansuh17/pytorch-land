@@ -1,6 +1,5 @@
 import os
 import math
-import json
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -127,6 +126,7 @@ class SchimdtSDATrainer(NetworkTrainer):
 
 
 if __name__ == '__main__':
+    import json
     dirpath = os.path.dirname(__file__)
     with open(os.path.join(dirpath, 'config.json'), 'r') as configf:
         config = json.loads(configf.read())

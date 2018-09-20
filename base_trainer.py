@@ -23,6 +23,11 @@ class NetworkTrainer:
         raise NotImplementedError
 
     def save_checkpoint(self, filename: str):
+        """Saves the model and training checkpoint.
+        The model only saves the model, and it is usually used for inference in the future.
+        The checkpoint saves the state dictionary of various modules
+        required for training. Usually this information is used to resume training.
+        """
         raise NotImplementedError
 
     def cleanup(self):

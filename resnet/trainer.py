@@ -9,27 +9,24 @@ from tensorboardX import SummaryWriter
 
 
 class ResnetTrainer(NetworkTrainer):
-    """Trainer for model."""
-    def __init__(self):
+    """Trainer for ResNet on imagenet 2012 dataset."""
+    def __init__(self, config):
         super().__init__()
-        self.input_root_dir = 'resnet_data_in'
-        self.output_root_dir = 'resnet_data_out'
-        self.log_dir = os.path.join(self.output_root_dir, 'tblogs')
-        self.models_dir = os.path.join(self.output_root_dir, 'models')
+        self.input_root_dir = config['input_root_dir']
+        self.output_root_dir = config['output_root_dir']
+        self.log_dir = os.path.join(self.output_root_dir, config['log_dir'])
+        self.models_dir = os.path.join(self.output_root_dir, config['model_dir'])
+
         # create directories
         os.makedirs(self.log_dir, exist_ok=True)
         os.makedirs(self.models_dir, exist_ok=True)
 
-        self.num_devices = 4
-        self.batch_size = 256
-        self.lr_init = 0.001
-        self.end_epoch = 400
+        self.num_devices = config['num_devices']
+        self.batch_size = config['batch_size']
+        self.lr_init = config['lr_init']
+        self.end_epoch = config['epoch']
         self.image_dim = 224
-
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.device_ids = list(range(self.num_devices))
-        self.seed = torch.initial_seed()
-        print('Using seed : {}'.format(self.seed))
 
         train_img_dir = os.path.join(self.input_root_dir, 'imagenet')
         self.dataloader, self.validate_dataloader, self.test_dataloader, misc = \
@@ -59,13 +56,14 @@ class ResnetTrainer(NetworkTrainer):
         print('Criterion : {}'.format(self.criterion))
 
         self.lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-            self.optimizer, mode='min', factor=0.1, patience=10, cooldown=30, verbose=True)
+            self.optimizer, mode='min', factor=config['lr']['factor'],
+            patience=10, cooldown=10, verbose=True)
         print('LR scheduler created')
 
         self.epoch, self.total_steps = self.set_train_status(resume=False)
         print('Starting from - Epoch : {}, Step : {}'.format(self.epoch, self.total_steps))
 
-    def set_train_status(self, resume: bool, checkpoint_path: str):
+    def set_train_status(self, resume: bool, checkpoint_path: str=''):
         """
         Args:
             resume (bool): True if resuming previous training session
@@ -93,7 +91,11 @@ class ResnetTrainer(NetworkTrainer):
             epoch_loss, _ = self.run_epoch(self.dataloader)
             if epoch_loss < best_loss:
                 best_loss = epoch_loss
-                self.save_model('resnet_model_best.pth')
+                # save best module as onnx format
+                dummy_input = torch.randn((10, 3, self.image_dim, self.image_dim))
+                module_path = os.path.join(self.models_dir, 'resnet.onnx')
+                self.save_module(
+                    self.resnet.module, module_path, save_onnx=True, dummy_input=dummy_input)
             self.save_checkpoint('resnet_e{}_state.pth'.format(self.epoch))
 
             # validate step
@@ -101,7 +103,7 @@ class ResnetTrainer(NetworkTrainer):
 
             # update learning rates
             self.lr_scheduler.step(val_loss)
-            self.save_learning_rate()
+            self.save_learning_rate(self.summary_writer, self.optimizer, self.total_steps)
             self.epoch += 1
         self.test()
 
@@ -140,10 +142,14 @@ class ResnetTrainer(NetworkTrainer):
                     accuracy = self.calc_batch_accuracy(output, targets)
                     accs.append(accuracy.item())
                     losses.append(loss.item())
-                    self.save_performance_summary(loss.item(), accuracy.item())
+                    self.log_performance(self.summary_writer,
+                                         {'loss': loss.item(), 'acc': accuracy.item()},
+                                         self.epoch,
+                                         self.total_steps)
 
                 if self.total_steps % 100 == 0:
-                    self.save_model_summary()
+                    self.save_module_summary(
+                        self.summary_writer, self.resnet.module, self.total_steps)
 
                 self.total_steps += 1
             else:  # no training - validation
@@ -165,19 +171,14 @@ class ResnetTrainer(NetworkTrainer):
         """
         with torch.no_grad():
             val_loss, val_acc = self.run_epoch(self.validate_dataloader, train=False)
-            self.save_performance_summary(val_loss, val_acc, summary_group='validate')
+            self.log_performance(self.summary_writer,
+                                 {'loss': val_loss, 'acc': val_acc},
+                                 self.epoch,
+                                 self.total_steps,
+                                 summary_group='validate')
         return val_loss, val_acc
 
-    def save_model(self, filename: str):
-        model_path = os.path.join(self.models_dir, filename)
-        torch.save(self.resnet, model_path)
-
     def save_checkpoint(self, filename: str):
-        """Saves the model and training checkpoint.
-        The model only saves the model, and it is usually used for inference in the future.
-        The checkpoint saves the state dictionary of various modules
-        required for training. Usually this information is used to resume training.
-        """
         checkpoint_path = os.path.join(self.models_dir, filename)
         # save the model and related checkpoints
         torch.save({
@@ -195,45 +196,16 @@ class ResnetTrainer(NetworkTrainer):
         accuracy = torch.sum(preds == target).float() / target.size()[0]
         return accuracy
 
-    def save_performance_summary(self, loss, accuracy, summary_group='train'):
-        print('Epoch ({}): {}\tStep: {}\tLoss: {:.6f}\tAcc: {:.6f}'
-            .format(summary_group, self.epoch, self.total_steps, loss, accuracy))
-        self.summary_writer.add_scalar(
-            '{}/loss'.format(summary_group), loss, self.total_steps)
-        self.summary_writer.add_scalar(
-            '{}/accuracy'.format(summary_group), accuracy, self.total_steps)
-
-    def save_learning_rate(self):
-        """Save learning rate to summary."""
-        for idx, param_group in enumerate(self.optimizer.param_groups):
-            lr = param_group['lr']
-            self.summary_writer.add_scalar('lr/{}'.format(idx), lr, self.total_steps)
-
-    def save_model_summary(self):
-        with torch.no_grad():
-            for name, parameter in self.resnet.named_parameters():
-                if parameter.grad is not None:
-                    avg_grad = torch.mean(parameter.grad)
-                    # print('\tavg_grad for {} = {:.6f}'.format(name, avg_grad))
-                    self.summary_writer.add_scalar(
-                        'avg_grad/{}'.format(name), avg_grad.item(), self.total_steps)
-                    self.summary_writer.add_histogram(
-                        'grad/{}'.format(name), parameter.grad.cpu().numpy(), self.total_steps)
-                if parameter.data is not None:
-                    avg_weight = torch.mean(parameter.data)
-                    # print('\tavg_weight for {} = {:.6f}'.format(name, avg_weight))
-                    self.summary_writer.add_scalar(
-                        'avg_weight/{}'.format(name), avg_weight.item(), self.total_steps)
-                    self.summary_writer.add_histogram(
-                        'weight/{}'.format(name), parameter.data.cpu().numpy(), self.total_steps)
-        print()
-
     def cleanup(self):
         self.summary_writer.close()
 
 
 if __name__ == '__main__':
-    trainer = ResnetTrainer()
+    import json
+    dirpath = os.path.dirname(__file__)
+    with open(os.path.join(dirpath, 'config.json'), 'r') as configf:
+        config = json.loads(configf.read())
+
+    trainer = ResnetTrainer(config)
     trainer.train()
-    print('Training done!')
     trainer.cleanup()

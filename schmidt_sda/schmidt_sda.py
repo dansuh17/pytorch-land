@@ -59,7 +59,7 @@ class SchmidtSDA(nn.Module):
         )
 
         # initialize weights
-        self.init_weights(self)
+        self.apply(self.init_weights)
 
     def forward(self, x):
         x, pool_indices = self.encoder_conv(x)  # latent variable
