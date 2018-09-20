@@ -48,7 +48,7 @@ class SchimdtSDATrainer(NetworkTrainer):
         print('Optimizer created - Adam')
 
         self.lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-            self.optimizer, mode='min', verbose=True, factor=0.1, patience=10)
+            self.optimizer, mode='min', verbose=True, factor=0.2, patience=7)
         print('LR scheduler created - Reduce on plateau')
 
         self.epoch = 0
@@ -77,7 +77,7 @@ class SchimdtSDATrainer(NetworkTrainer):
 
     def run_epoch(self, dataloader, train=True):
         losses = []
-        for clean_img, noisy_img in dataloader:  # TODO: change dimension of dataloader
+        for clean_img, noisy_img in dataloader:
             clean_img, noisy_img = clean_img.to(self.device), noisy_img.to(self.device)
 
             output, _ = self.dae(noisy_img)  # latent vector not used
