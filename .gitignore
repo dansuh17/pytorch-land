@@ -20,3 +20,6 @@ c3dl_*.json
 
 # denoising autoencoders
 denoising_autoencoder/mnist/
+
+# ipython
+.ipynb_checkpoints/

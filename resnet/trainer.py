@@ -3,7 +3,7 @@ from resnet.model import ResNet34
 import math
 import torch
 from torch import optim, nn
-from dataset import load_imagenet
+from datasets.img_popular import load_imagenet
 from base_trainer import NetworkTrainer
 from tensorboardX import SummaryWriter
 

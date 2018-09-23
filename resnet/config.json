@@ -10,6 +10,6 @@
   "lr": {
     "patience": 10,
     "cooldown": 10,
-    "factor": 0.2,
+    "factor": 0.2
   }
 }

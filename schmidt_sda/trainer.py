@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torchvision
-from datasets.noisy_dataset import load_noisy_mnist_dataloader
+from datasets.noisy_mnist import load_noisy_mnist_dataloader
 from .schmidt_sda import SchmidtSDA
 from base_trainer import NetworkTrainer
 from tensorboardX import SummaryWriter

@@ -6,7 +6,7 @@ import torch.optim as optim
 import torchvision.utils
 from base_trainer import NetworkTrainer
 from .sdae import SDAE
-from datasets.noisy_dataset import load_noisy_mnist_dataloader
+from datasets.noisy_mnist import load_noisy_mnist_dataloader
 from tensorboardX import SummaryWriter
 
 
