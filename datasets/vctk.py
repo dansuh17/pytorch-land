@@ -25,13 +25,38 @@ import scipy
 import librosa
 import numpy as np
 from torch.utils.data import Dataset
+from tqdm import tqdm
 
 
 N_MELS = 40  # number of mel filters
+CLEAN_TESTSET_WAV = 'clean_testset_wav'
+CLEAN_TRAINSET_28SPK_WAV = 'clean_trainset_28spk_wav'
+CLEAN_TRAINSET_56SPK_WAV = 'clean_trainset_56spk_wav'
+NOISY_TESTSET_WAV = 'noisy_testset_wav'
+NOISY_TRAINSET_28SPK_WAV = 'noisy_trainset_28spk_wav'
+NOISY_TRAINSET_56SPK_WAV = 'noisy_trainset_56spk_wav'
 
 
 def load_vctk_dataloader(batch_size: int):
     pass
+
+
+def unpack_dataset(fname: str, out_path: str):
+    os.system('unzip -d {} {}'.format(out_path, fname))
+    # unzip clean audio files
+    os.system('unzip -d {} {}'.format(
+        out_path, os.path.join(out_path, '{}.zip'.format(CLEAN_TESTSET_WAV))))
+    os.system('unzip -d {} {}'.format(
+        out_path, os.path.join(out_path, '{}.zip'.format(CLEAN_TRAINSET_28SPK_WAV))))
+    os.system('unzip -d {} {}'.format(
+        out_path, os.path.join(out_path, '{}.zip'.format(CLEAN_TRAINSET_56SPK_WAV))))
+    # unzip noisy audio files
+    os.system('unzip -d {} {}'.format(
+        out_path, os.path.join(out_path, '{}.zip'.format(NOISY_TESTSET_WAV))))
+    os.system('unzip -d {} {}'.format(
+        out_path, os.path.join(out_path, '{}.zip'.format(NOISY_TRAINSET_28SPK_WAV))))
+    os.system('unzip -d {} {}'.format(
+        out_path, os.path.join(out_path, '{}.zip'.format(NOISY_TRAINSET_56SPK_WAV))))
 
 
 def noisy_vctk_preprocess(in_path: str, out_path: str, clean_dir: str, noisy_dir: str,
@@ -40,7 +65,8 @@ def noisy_vctk_preprocess(in_path: str, out_path: str, clean_dir: str, noisy_dir
         hop_size = window_size // 2  # 0.5 hop
 
     clean_data_path = os.path.join(in_path, clean_dir)
-    for fname in os.listdir(clean_data_path):
+    print('Preprocessing : {} and '.format(clean_dir, noisy_dir))
+    for fname in tqdm(os.listdir(clean_data_path), ascii=True):
         # parse the file name that should have form : 'p125_111.wav'
         re_match = re.match(r'p(?P<class_num>\d+)_(?P<wav_id>\d+)\.wav', fname)
         class_num = re_match.group('class_num')
@@ -125,6 +151,15 @@ class NoisyVCTKSpectrogram(Dataset):
 
 if __name__ == '__main__':
     path = os.path.join(os.path.dirname(__file__))
-    noisy_dir = 'noisy_testset_wav'
-    clean_dir = 'clean_testset_wav'
-    noisy_vctk_preprocess(in_path=path, out_path='vctk_processed', noisy_dir=noisy_dir, clean_dir=clean_dir)
+    unpack_dataset('DS_10283_2791.zip', out_path=path)
+
+    out_path = 'vctk_processed'
+    noisy_vctk_preprocess(
+        in_path=path, out_path=out_path,
+        noisy_dir=NOISY_TRAINSET_28SPK_WAV, clean_dir=NOISY_TRAINSET_56SPK_WAV)
+    noisy_vctk_preprocess(
+        in_path=path, out_path=out_path,
+        noisy_dir=NOISY_TRAINSET_56SPK_WAV, clean_dir=NOISY_TRAINSET_56SPK_WAV)
+    noisy_vctk_preprocess(
+        in_path=path, out_path=out_path,
+        noisy_dir=NOISY_TESTSET_WAV, clean_dir=CLEAN_TESTSET_WAV)
