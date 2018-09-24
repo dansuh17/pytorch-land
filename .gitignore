@@ -1,11 +1,35 @@
+### general
 tags
 venv/
-.idea/
-__pycache__/
-resnet_data_in/
-resnet_data_out/
 
-# my-specific
+### OSX
+._*
+.DS_Store
+
+### intellij
+.idea/
+out/
+
+### python
+__pycache__/
+*.py[cod]
+*$py.class
+.python-version
+.venv
+venv/
+build/
+dist/
+
+
+### data paths
+*_data_in/
+*_data_out/
+
+### ipython
+.ipynb_checkpoints/
+*/.ipynb_checkpoints/*
+
+### user-specifics (c3dl)
 resnet.json
 resnet_imagenet.json
 run.sh
@@ -14,12 +38,7 @@ user_dev_workspace/
 log.log
 vgg_imagenet.json
 c3dl_*.json
+*.zip
 
-# data output paths
-*_data_out/
-
-# denoising autoencoders
+### denoising autoencoders
 denoising_autoencoder/mnist/
-
-# ipython
-.ipynb_checkpoints/
