@@ -151,15 +151,16 @@ class NoisyVCTKSpectrogram(Dataset):
 
 if __name__ == '__main__':
     path = os.path.join(os.path.dirname(__file__))
-    unpack_dataset('DS_10283_2791.zip', out_path=path)
+    dataset_path = os.path.join(path, 'vctk_corpus')
+    unpack_dataset('DS_10283_2791.zip', out_path=dataset_path)
 
     out_path = 'vctk_processed'
     noisy_vctk_preprocess(
-        in_path=path, out_path=out_path,
+        in_path=dataset_path, out_path=out_path,
         noisy_dir=NOISY_TRAINSET_28SPK_WAV, clean_dir=NOISY_TRAINSET_56SPK_WAV)
     noisy_vctk_preprocess(
-        in_path=path, out_path=out_path,
+        in_path=dataset_path, out_path=out_path,
         noisy_dir=NOISY_TRAINSET_56SPK_WAV, clean_dir=NOISY_TRAINSET_56SPK_WAV)
     noisy_vctk_preprocess(
-        in_path=path, out_path=out_path,
+        in_path=dataset_path, out_path=out_path,
         noisy_dir=NOISY_TESTSET_WAV, clean_dir=CLEAN_TESTSET_WAV)
