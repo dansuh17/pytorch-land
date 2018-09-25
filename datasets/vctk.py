@@ -32,9 +32,11 @@ N_MELS = 40  # number of mel filters
 CLEAN_TESTSET_WAV = 'clean_testset_wav'
 CLEAN_TRAINSET_28SPK_WAV = 'clean_trainset_28spk_wav'
 CLEAN_TRAINSET_56SPK_WAV = 'clean_trainset_56spk_wav'
+CLEAN_TRAINSET_DIR = 'clean_trainset'
 NOISY_TESTSET_WAV = 'noisy_testset_wav'
 NOISY_TRAINSET_28SPK_WAV = 'noisy_trainset_28spk_wav'
 NOISY_TRAINSET_56SPK_WAV = 'noisy_trainset_56spk_wav'
+NOISY_TRAINSET_DIR = 'noisy_trainset'
 
 
 def load_vctk_dataloader(batch_size: int):
@@ -42,21 +44,30 @@ def load_vctk_dataloader(batch_size: int):
 
 
 def unpack_dataset(fname: str, out_path: str):
-    os.system('unzip -d {} {}'.format(out_path, fname))
+    # os.system('unzip -d {} {}'.format(out_path, fname))
+    # data output directory
+    clean_dir = os.path.join(out_path, CLEAN_TRAINSET_DIR)
+    os.makedirs(clean_dir, exist_ok=True)
+    noisy_dir = os.path.join(out_path, NOISY_TRAINSET_DIR)
+    os.makedirs(noisy_dir, exist_ok=True)
     # unzip clean audio files
     os.system('unzip -d {} {}'.format(
         out_path, os.path.join(out_path, '{}.zip'.format(CLEAN_TESTSET_WAV))))
     os.system('unzip -d {} {}'.format(
         out_path, os.path.join(out_path, '{}.zip'.format(CLEAN_TRAINSET_28SPK_WAV))))
+    os.system('mv {}/* {}'.format(os.path.join(out_path, CLEAN_TRAINSET_28SPK_WAV), clean_dir))
     os.system('unzip -d {} {}'.format(
         out_path, os.path.join(out_path, '{}.zip'.format(CLEAN_TRAINSET_56SPK_WAV))))
+    os.system('mv {}/* {}'.format(os.path.join(out_path, CLEAN_TRAINSET_56SPK_WAV), clean_dir))
     # unzip noisy audio files
     os.system('unzip -d {} {}'.format(
         out_path, os.path.join(out_path, '{}.zip'.format(NOISY_TESTSET_WAV))))
     os.system('unzip -d {} {}'.format(
         out_path, os.path.join(out_path, '{}.zip'.format(NOISY_TRAINSET_28SPK_WAV))))
+    os.system('mv {}/* {}'.format(os.path.join(out_path, NOISY_TRAINSET_28SPK_WAV), noisy_dir))
     os.system('unzip -d {} {}'.format(
         out_path, os.path.join(out_path, '{}.zip'.format(NOISY_TRAINSET_56SPK_WAV))))
+    os.system('mv {}/* {}'.format(os.path.join(out_path, NOISY_TRAINSET_56SPK_WAV), noisy_dir))
 
 
 def noisy_vctk_preprocess(in_path: str, out_path: str, clean_dir: str, noisy_dir: str,
@@ -157,10 +168,13 @@ if __name__ == '__main__':
     out_path = 'vctk_processed'
     noisy_vctk_preprocess(
         in_path=dataset_path, out_path=out_path,
-        noisy_dir=NOISY_TRAINSET_28SPK_WAV, clean_dir=NOISY_TRAINSET_56SPK_WAV)
-    noisy_vctk_preprocess(
-        in_path=dataset_path, out_path=out_path,
-        noisy_dir=NOISY_TRAINSET_56SPK_WAV, clean_dir=NOISY_TRAINSET_56SPK_WAV)
+        noisy_dir=NOISY_TRAINSET_DIR, clean_dir=CLEAN_TRAINSET_DIR)
+    # noisy_vctk_preprocess(
+    #     in_path=dataset_path, out_path=out_path,
+    #     noisy_dir=NOISY_TRAINSET_28SPK_WAV, clean_dir=NOISY_TRAINSET_56SPK_WAV)
+    # noisy_vctk_preprocess(
+    #     in_path=dataset_path, out_path=out_path,
+    #     noisy_dir=NOISY_TRAINSET_56SPK_WAV, clean_dir=NOISY_TRAINSET_56SPK_WAV)
     noisy_vctk_preprocess(
         in_path=dataset_path, out_path=out_path,
         noisy_dir=NOISY_TESTSET_WAV, clean_dir=CLEAN_TESTSET_WAV)
