@@ -58,7 +58,7 @@ class InceptionNetTrainer(NetworkTrainer):
         print('LR scheduler created')
 
         self.epoch = 0
-        self.total_steps = 0
+        self.step = 0
 
     def train(self):
         best_loss = math.inf
@@ -79,7 +79,7 @@ class InceptionNetTrainer(NetworkTrainer):
 
             # update learning rates
             self.lr_schedule.step(val_loss)
-            self.save_learning_rate(self.writer, self.optimizer, self.total_steps)
+            self.save_learning_rate(self.writer, self.optimizer, self.step)
             self.epoch += 1
         # test step
         self.test()
@@ -95,7 +95,7 @@ class InceptionNetTrainer(NetworkTrainer):
                 self.writer,
                 {'loss': val_loss.item(), 'acc': val_acc.item()},
                 self.epoch,
-                self.total_steps)
+                self.step)
         return val_loss, val_acc
 
     def run_epoch(self, dataloader, train=True):
@@ -114,7 +114,7 @@ class InceptionNetTrainer(NetworkTrainer):
                 self.optimizer.step()
 
                 # save training results
-                if self.total_steps % 20 == 0:
+                if self.step % 20 == 0:
                     accuracy = self.calc_batch_accuracy(output, targets)
                     accs.append(accuracy.item())
                     losses.append(loss.item())
@@ -122,13 +122,13 @@ class InceptionNetTrainer(NetworkTrainer):
                         self.writer,
                         {'loss': loss.item(), 'acc': accuracy.item()},
                         self.epoch,
-                        self.total_steps)
+                        self.step)
 
-                if self.total_steps % 200 == 0:
+                if self.step % 200 == 0:
                     self.save_module_summary(
-                        self.writer, self.net.module, self.total_steps)
+                        self.writer, self.net.module, self.step)
 
-                self.total_steps += 1
+                self.step += 1
             else:
                 accuracy = self.calc_batch_accuracy(output, targets)
                 accs.append(accuracy.item())
@@ -150,7 +150,7 @@ class InceptionNetTrainer(NetworkTrainer):
         # save the model and related checkpoints
         torch.save({
             'epoch': self.epoch,
-            'total_steps': self.total_steps,
+            'step': self.step,
             'torch_seed': self.seed,
             'seed': random.seed(),
             'model': self.net.state_dict(),
