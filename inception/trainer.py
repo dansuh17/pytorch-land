@@ -28,7 +28,7 @@ class InceptionNetTrainer(NetworkTrainer):
         self.image_dim = 229
         self.device_ids = list(range(self.num_devices))
 
-        train_img_dir = os.path.join(self.input_root_dir, 'vctk_preprocess')
+        train_img_dir = os.path.join(self.input_root_dir, 'imagenet')
         self.train_dataloader, self.validate_dataloader, self.test_dataloader, misc = \
             load_imagenet(train_img_dir, self.batch_size, self.image_dim)
         self.num_classes = misc['num_classes']
