@@ -236,11 +236,11 @@ class InceptionV2(nn.Module):
 if __name__ == '__main__':
     sample = torch.randn((10, 192, 35, 35))
     inc_a = InceptionA(192, 32)
-    # print(inc_a(sample).size())
+    print(inc_a(sample).size())
 
-    # sample2 = torch.randn((10, 3, 299, 299))
-    # inc = InceptionV2()
-    # print(inc(sample2).size())
+    sample2 = torch.randn((10, 3, 299, 299))
+    inc = InceptionV2(num_classes=1000, img_dim=299)
+    print(inc(sample2).size())
 
     sample2 = torch.randn((10, 3, 64, 64))
     inc = InceptionV2(num_classes=10, img_dim=64)
