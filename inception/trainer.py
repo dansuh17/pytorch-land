@@ -34,7 +34,7 @@ class InceptionNetTrainer(NetworkTrainer):
         self.num_classes = misc['num_classes']
         print('Dataloader created')
 
-        net = InceptionV2(self.num_classes, self.image_dim)
+        net = InceptionV2(self.num_classes, self.image_dim).to(self.device)
         self.net = torch.nn.parallel.DataParallel(net, device_ids=self.device_ids)
         print('Model created')
         print(self.net)
