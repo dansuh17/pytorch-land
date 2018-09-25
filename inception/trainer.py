@@ -42,7 +42,7 @@ class InceptionNetTrainer(NetworkTrainer):
         self.optimizer = optim.Adam(params=self.net.parameters(), lr=self.lr_init)
         print('Optimizer created')
 
-        self.summary_writer = SummaryWriter(log_dir=self.log_dir)
+        self.writer = SummaryWriter(log_dir=self.log_dir)
         print('Summary Writer created')
 
         self.criterion = nn.CrossEntropyLoss()
@@ -79,7 +79,7 @@ class InceptionNetTrainer(NetworkTrainer):
 
             # update learning rates
             self.lr_schedule.step(val_loss)
-            self.save_learning_rate(self.summary_writer, self.optimizer, self.total_steps)
+            self.save_learning_rate(self.writer, self.optimizer, self.total_steps)
             self.epoch += 1
         # test step
         self.test()
@@ -92,7 +92,7 @@ class InceptionNetTrainer(NetworkTrainer):
         with torch.no_grad():
             val_loss, val_acc = self.run_epoch(self.validate_dataloader, train=False)
             self.log_performance(
-                self.summary_writer,
+                self.writer,
                 {'loss': val_loss.item(), 'acc': val_acc.item()},
                 self.epoch,
                 self.total_steps)
@@ -119,14 +119,14 @@ class InceptionNetTrainer(NetworkTrainer):
                     accs.append(accuracy.item())
                     losses.append(loss.item())
                     self.log_performance(
-                        self.summary_writer,
+                        self.writer,
                         {'loss': loss.item(), 'acc': accuracy.item()},
                         self.epoch,
                         self.total_steps)
 
                 if self.total_steps % 200 == 0:
                     self.save_module_summary(
-                        self.summary_writer, self.net.module, self.total_steps)
+                        self.writer, self.net.module, self.total_steps)
 
                 self.total_steps += 1
             else:
@@ -158,7 +158,7 @@ class InceptionNetTrainer(NetworkTrainer):
         }, checkpoint_path)
 
     def cleanup(self):
-        self.summary_writer.close()
+        self.writer.close()
 
 
 if __name__ == '__main__':
