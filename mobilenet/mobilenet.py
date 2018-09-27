@@ -38,6 +38,7 @@ class MobileNet(nn.Module):
         self.dw_conv4 = DepthwiseSeparableConv2d(128, 256, stride=2)  # (b, 256, 28, 28)
         self.dw_conv5 = DepthwiseSeparableConv2d(256, 256)  # (b, 256, 28, 28)
         self.dw_conv6 = DepthwiseSeparableConv2d(256, 512, stride=2)  # (b, 512, 14, 14)
+        # increase model capacity on this dimension
         self.dw_conv7 = DepthwiseSeparableConv2d(512, 512)  # (b, 512, 14, 14)
         self.dw_conv8 = DepthwiseSeparableConv2d(512, 512)  # (b, 512, 14, 14)
         self.dw_conv9 = DepthwiseSeparableConv2d(512, 512)  # (b, 512, 14, 14)
@@ -45,6 +46,7 @@ class MobileNet(nn.Module):
         self.dw_conv11 = DepthwiseSeparableConv2d(512, 512)  # (b, 512, 14, 14)
         self.dw_conv12 = DepthwiseSeparableConv2d(512, 1024, stride=2)  # (b, 1024, 7, 7)
         self.dw_conv13 = DepthwiseSeparableConv2d(1024, 1024, stride=2, padding=4)  # (b, 1024, 7, 7)
+        # TODO: calculate kernel size
         self.avg_pool = nn.AvgPool2d(kernel_size=7)  # (b, 1024, 1, 1)
         self.fc = nn.Linear(1024, self.num_classes)  # (b, 1000)
 
@@ -70,6 +72,7 @@ class MobileNet(nn.Module):
 
 
 if __name__ == '__main__':
+    # test with expected input size
     net = MobileNet(1000)
     dummy_input = torch.randn((10, 3, 224, 224))
     output = net(dummy_input)

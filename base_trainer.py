@@ -8,6 +8,7 @@ class NetworkTrainer:
     This provides a minimal set of methods that any trainer
     should implement.
     """
+
     def __init__(self):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.seed = torch.initial_seed()

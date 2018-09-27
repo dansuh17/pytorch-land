@@ -2,13 +2,13 @@ import os
 import torch
 import random
 import math
-from .inception_v2 import InceptionV2
+from .mobilenet import MobileNet
 from datasets.img_popular import load_imagenet
 from tensorboardX import SummaryWriter
 from base_trainer import NetworkTrainer
 
 
-class InceptionNetTrainer(NetworkTrainer):
+class MobileNetTrainer(NetworkTrainer):
     def __init__(self, config):
         super().__init__()
         self.input_root_dir = config['input_root_dir']
@@ -24,7 +24,7 @@ class InceptionNetTrainer(NetworkTrainer):
         self.batch_size = config['batch_size']
         self.lr_init = config['lr_init']
         self.end_epoch = config['epoch']
-        self.image_dim = 229
+        self.image_dim = 224
         self.device_ids = list(range(self.num_devices))
 
         train_img_dir = os.path.join(self.input_root_dir, 'imagenet')
@@ -33,7 +33,7 @@ class InceptionNetTrainer(NetworkTrainer):
         self.num_classes = misc['num_classes']
         print('Dataloader created')
 
-        net = InceptionV2(self.num_classes, self.image_dim).to(self.device)
+        net = MobileNet(self.num_classes, self.image_dim).to(self.device)
         self.net = torch.nn.parallel.DataParallel(net, device_ids=self.device_ids)
         print('Model created')
         print(self.net)
@@ -60,12 +60,6 @@ class InceptionNetTrainer(NetworkTrainer):
         self.step = 0
 
     def train(self):
-        """
-        Run the entire train. Starts the training from 'self.epoch', and 'self.step'.
-        At the end of every training epochs, this will run a validation step
-        as well as learning rate updates, etc.
-        At the end of training, this runs the test step.
-        """
         best_loss = math.inf
         for _ in range(self.epoch, self.end_epoch):
             self.writer.add_scalar('epoch', self.epoch, self.step)
@@ -74,10 +68,10 @@ class InceptionNetTrainer(NetworkTrainer):
                 best_loss = train_loss
                 # save the best module
                 dummy_input = torch.randn((10, 3, self.image_dim, self.image_dim))
-                module_path = os.path.join(self.models_dir, 'inception_v2.onnx')
+                module_path = os.path.join(self.models_dir, 'mobilenet.onnx')
                 self.save_module(
                     self.net.module, module_path, save_onnx=True, dummy_input=dummy_input)
-            self.save_checkpoint('inceptionv2_e{}_state.pth'.format(self.epoch))
+            self.save_checkpoint('mobilenet_e{}_state.pth'.format(self.epoch))
 
             # validate
             val_loss, _ = self.validate()
@@ -172,6 +166,6 @@ if __name__ == '__main__':
     with open(os.path.join(dirpath, 'config.json'), 'r') as configf:
         config = json.loads(configf.read())
 
-    trainer = InceptionNetTrainer(config)
+    trainer = MobileNetTrainer(config)
     trainer.train()
     trainer.cleanup()
