@@ -83,7 +83,7 @@ class InceptionNetTrainer(NetworkTrainer):
             val_loss, _ = self.validate()
 
             # update learning rates
-            self.lr_schedule.step(val_loss)
+            self.lr_scheduler.step(val_loss)
             self.save_learning_rate(self.writer, self.optimizer, self.step)
             self.epoch += 1
         # test step
