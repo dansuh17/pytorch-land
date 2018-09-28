@@ -1,5 +1,6 @@
 import os
 import torch
+from torch import nn, optim
 import random
 import math
 from .mobilenet import MobileNet
@@ -33,7 +34,7 @@ class MobileNetTrainer(NetworkTrainer):
         self.num_classes = misc['num_classes']
         print('Dataloader created')
 
-        net = MobileNet(self.num_classes, self.image_dim).to(self.device)
+        net = MobileNet(self.num_classes).to(self.device)
         self.net = torch.nn.parallel.DataParallel(net, device_ids=self.device_ids)
         print('Model created')
         print(self.net)
@@ -67,7 +68,7 @@ class MobileNetTrainer(NetworkTrainer):
             if train_loss < best_loss:
                 best_loss = train_loss
                 # save the best module
-                dummy_input = torch.randn((10, 3, self.image_dim, self.image_dim))
+                dummy_input = torch.randn((10, 3, self.image_dim, self.image_dim)).to(self.device)
                 module_path = os.path.join(self.models_dir, 'mobilenet.onnx')
                 self.save_module(
                     self.net.module, module_path, save_onnx=True, dummy_input=dummy_input)

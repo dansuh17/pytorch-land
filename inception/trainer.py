@@ -1,7 +1,8 @@
 import os
-import torch
 import random
 import math
+import torch
+from torch import optim, nn
 from .inception_v2 import InceptionV2
 from datasets.img_popular import load_imagenet
 from tensorboardX import SummaryWriter
@@ -73,7 +74,7 @@ class InceptionNetTrainer(NetworkTrainer):
             if train_loss < best_loss:
                 best_loss = train_loss
                 # save the best module
-                dummy_input = torch.randn((10, 3, self.image_dim, self.image_dim))
+                dummy_input = torch.randn((10, 3, self.image_dim, self.image_dim)).to(self.device)
                 module_path = os.path.join(self.models_dir, 'inception_v2.onnx')
                 self.save_module(
                     self.net.module, module_path, save_onnx=True, dummy_input=dummy_input)
