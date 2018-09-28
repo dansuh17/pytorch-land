@@ -6,7 +6,8 @@ import torch.optim as optim
 import torchvision.utils
 from base_trainer import NetworkTrainer
 from .sdae import SDAE
-from datasets.noisy_mnist import load_noisy_mnist_dataloader
+# from datasets.noisy_mnist import load_noisy_mnist_dataloader
+from datasets.vctk import load_vctk_dataloaders
 from tensorboardX import SummaryWriter
 
 
@@ -29,10 +30,17 @@ class SDAETrainer(NetworkTrainer):
         self.end_epoch = 400
         self.device_ids = list(range(self.num_devices))
 
-        self.input_dim = 28 * 28
-        self.input_shape = (self.input_dim, )
+        ### load noisy mnist dataset
+        # self.input_dim = 28 * 28
+        # self.input_shape = (self.input_dim, )
+        # self.train_dataloader, self.val_dataloader, self.test_dataloader = \
+        #     load_noisy_mnist_dataloader(self.batch_size, self.input_shape)
+
+        ### load noisy vctk dataset
+        self.input_dim = 11 * 40
+        datapath = os.path.join(self.input_root_dir, 'vctk_processed')
         self.train_dataloader, self.val_dataloader, self.test_dataloader = \
-            load_noisy_mnist_dataloader(self.batch_size, self.input_shape)
+            load_vctk_dataloaders(datapath, self.input_dim)
         print('Dataloader created')
 
         sdae = SDAE(input_dim=self.input_dim).to(self.device)

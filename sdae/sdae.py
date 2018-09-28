@@ -8,7 +8,7 @@ class SDAE(nn.Module):
     This implementation assumes training with MNIST dataset only.
     (See `noisy_dataset.NoisyMnistDataset` about how dataset looks like.)
     """
-    def __init__(self, input_dim):
+    def __init__(self, input_dim: int):
         super().__init__()
         self.encoder = nn.Sequential(
             nn.Linear(input_dim, 400),
