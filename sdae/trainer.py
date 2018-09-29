@@ -94,7 +94,9 @@ class SDAETrainer(NetworkTrainer):
         """
         losses = []
         for oimg, cimg in dataloader:  # original images / corrupted images pairs
-            oimg, cimg = oimg.to(self.device), cimg.to(self.device)
+            # cast to FloatTensor (the images have been falsely converted to DoubleTensor)
+            oimg = oimg.float().to(self.device)
+            cimg = cimg.float().to(self.device)
 
             out = self.sdae(cimg)
             loss = self.criterion(out, oimg)
