@@ -30,7 +30,8 @@ class SDAETrainer(NetworkTrainer):
         self.end_epoch = 400
         self.device_ids = list(range(self.num_devices))
 
-        ### load noisy mnist dataset
+        """Uncomment one of below - 1. noisy MNIST images 2. noisy VCTK spectrograms."""
+        # 1. load noisy mnist dataset
         # self.input_width = 28
         # self.input_height = 28
         # self.input_dim = 28 * 28
@@ -38,7 +39,7 @@ class SDAETrainer(NetworkTrainer):
         # self.train_dataloader, self.val_dataloader, self.test_dataloader = \
         #     load_noisy_mnist_dataloader(self.batch_size, self.input_shape)
 
-        ### load noisy vctk dataset
+        # 2. load noisy vctk dataset
         self.input_width = 11
         self.input_height = 40
         self.input_dim = self.input_width * self.input_height
@@ -101,7 +102,6 @@ class SDAETrainer(NetworkTrainer):
             # cast to FloatTensor (the images have been falsely converted to DoubleTensor)
             oimg = oimg.float().to(self.device)
             cimg = cimg.float().to(self.device)
-            print(oimg.size())
 
             out = self.sdae(cimg)
             loss = self.criterion(out, oimg)
