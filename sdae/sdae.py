@@ -29,9 +29,11 @@ class SDAE(nn.Module):
         self.init_weights(self)
 
     def forward(self, x):
+        in_size = x.size()
+        x = x.view(in_size[0], -1)
         x = self.encoder(x)
         x = self.decoder(x)
-        return x
+        return x.view(in_size)
 
     @staticmethod
     def init_weights(m):

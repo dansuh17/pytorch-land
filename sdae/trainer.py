@@ -40,7 +40,7 @@ class SDAETrainer(NetworkTrainer):
         self.input_dim = 11 * 40
         datapath = os.path.join(self.input_root_dir, 'vctk_processed')
         self.train_dataloader, self.val_dataloader, self.test_dataloader = \
-            load_vctk_dataloaders(datapath, self.input_dim)
+            load_vctk_dataloaders(datapath, self.batch_size)
         print('Dataloader created')
 
         sdae = SDAE(input_dim=self.input_dim).to(self.device)
@@ -97,6 +97,7 @@ class SDAETrainer(NetworkTrainer):
             # cast to FloatTensor (the images have been falsely converted to DoubleTensor)
             oimg = oimg.float().to(self.device)
             cimg = cimg.float().to(self.device)
+            print(oimg.size())
 
             out = self.sdae(cimg)
             loss = self.criterion(out, oimg)
