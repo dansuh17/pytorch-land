@@ -31,13 +31,17 @@ class SDAETrainer(NetworkTrainer):
         self.device_ids = list(range(self.num_devices))
 
         ### load noisy mnist dataset
+        # self.input_width = 28
+        # self.input_height = 28
         # self.input_dim = 28 * 28
         # self.input_shape = (self.input_dim, )
         # self.train_dataloader, self.val_dataloader, self.test_dataloader = \
         #     load_noisy_mnist_dataloader(self.batch_size, self.input_shape)
 
         ### load noisy vctk dataset
-        self.input_dim = 11 * 40
+        self.input_width = 11
+        self.input_height = 40
+        self.input_dim = self.input_width * self.input_height
         datapath = os.path.join(self.input_root_dir, 'vctk_processed')
         self.train_dataloader, self.val_dataloader, self.test_dataloader = \
             load_vctk_dataloaders(datapath, self.batch_size)
@@ -125,8 +129,10 @@ class SDAETrainer(NetworkTrainer):
             else:  # validation / test epoch
                 losses.append(loss.item())
                 # save example images
-                grid_input = torchvision.utils.make_grid(cimg[:4, :].view(-1, 1, 28, 28), nrow=4, normalize=True)
-                grid_output = torchvision.utils.make_grid(out[:4, :].view(-1, 1, 28, 28), nrow=4, normalize=True)
+                grid_input = torchvision.utils.make_grid(
+                    cimg[:4, :].view(-1, 1, self.input_width, self.input_height), nrow=4, normalize=True)
+                grid_output = torchvision.utils.make_grid(
+                    out[:4, :].view(-1, 1, self.input_width, self.input_height), nrow=4, normalize=True)
                 self.summ_writer.add_image(
                     '{}/input'.format(self.epoch), grid_input, self.step)
                 self.summ_writer.add_image(
