@@ -133,8 +133,26 @@ def unpack_dataset(fname: str, out_path: str):
     os.system('mv {}/* {}'.format(os.path.join(out_path, NOISY_TRAINSET_56SPK_WAV), noisy_dir))
 
 
-def noisy_vctk_preprocess(in_path: str, out_path: str, clean_dir: str, noisy_dir: str,
-                          target_sr=16000, window_size=256, hop_size: int=None, split_size=11, mel=True):
+def noisy_vctk_preprocess(
+        in_path: str, out_path: str, clean_dir: str, noisy_dir: str,
+        target_sr=16000, window_size=256, hop_size: int=None, split_size=11, mel=True):
+    """
+    Function for preprocessing VCTK speech data.
+    The dataset should already have been unzipped to `in_path` directory.
+    Preprocessed files are extracted in `.npy` format that contains
+    clean, noisy spectrogram pairs.
+
+    Args:
+        in_path (str): input directory
+        out_path (str): desired output directory
+        clean_dir (str): clean dataset directory (input)
+        noisy_dir (str): noisy dataset directory (input)
+        target_sr (int): target sample rate
+        window_size (int): window size
+        hop_size (int): hop size
+        split_size (int): number of frames of a chunk
+        mel (bool): True if wanting to use mel-spectrogram
+    """
     if hop_size is None:
         hop_size = window_size // 2  # 0.5 hop by default
 

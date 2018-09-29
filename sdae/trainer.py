@@ -15,8 +15,8 @@ class SDAETrainer(NetworkTrainer):
     """Trainer for Stacked Denoising Auto-Encoder"""
     def __init__(self):
         super().__init__()
-        self.input_root_dir = 'sdae_data_in'
-        self.output_root_dir = 'sdae_data_out'
+        self.input_root_dir = 'speech_denoise_data_in'
+        self.output_root_dir = 'speech_denoise_data_out'
         self.log_dir = os.path.join(self.output_root_dir, 'tblogs')
         self.models_dir = os.path.join(self.output_root_dir, 'models')
 
@@ -78,7 +78,7 @@ class SDAETrainer(NetworkTrainer):
                 best_loss = train_loss
                 # save best model in onnx format
                 dummy_input = torch.randn((10, 1, self.input_dim)).to(self.device)
-                self.save_module(self.sdae.module, os.path.join(self.models_dir, 'sdae.onnx'),
+                self.save_module(self.sdae.module, os.path.join(self.models_dir, 'speech_denoise.onnx'),
                                  save_onnx=True, dummy_input=dummy_input)
 
             # validate
@@ -113,7 +113,8 @@ class SDAETrainer(NetworkTrainer):
                 if self.step % 500 == 0:  # save models and their info
                     # save the module in onnx format
                     self.save_module(
-                        self.sdae.module, os.path.join(self.models_dir, 'sdae_model_e{}.pth'.format(self.epoch)))
+                        self.sdae.module, os.path.join(
+                            self.models_dir, 'speech_denoise_model_e{}.pth'.format(self.epoch)))
                     self.save_module_summary(
                         self.summ_writer, self.sdae, self.step, save_histogram=False)
 

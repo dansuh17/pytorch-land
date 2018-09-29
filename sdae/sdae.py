@@ -1,3 +1,4 @@
+import torch
 from torch import nn
 
 
@@ -38,3 +39,13 @@ class SDAE(nn.Module):
             # use kaiming due to the use of SELU nonlinearity
             nn.init.kaiming_normal_(m.weight)
             nn.init.constant_(m.bias, 0)
+
+
+if __name__ == '__main__':
+    # test with dummy input
+    input_size = 40 * 11
+    net = SDAE(input_dim=input_size)
+    dummy_input = torch.randn((10, 3, input_size))
+    output = net(dummy_input)
+    print(output.size())
+    assert output.size()[2] == input_size
