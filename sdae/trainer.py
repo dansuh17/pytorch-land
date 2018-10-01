@@ -159,6 +159,18 @@ class SDAETrainer(NetworkTrainer):
 
     @staticmethod
     def make_grid_from_mel(imgs, sr=16000, n_fft=256, n_mels=40):  # TODO: acquire these from constants
+        """
+        Make image grid from a number of mel-spectrograms.
+
+        Args:
+            imgs (torch.FloatTensor): tensor of images
+            sr (int): sample rate
+            n_fft (int): num_fft
+            n_mels (int): number of mel-spectrogram bins
+
+        Returns:
+            list of tensors representing images
+        """
         # TODO: make this static resource
         # inverse of mel spectrogram matrix that can revert mel-spec to power-spectrogram
         mel_basis_inv = np.matrix(librosa.filters.mel(sr, n_fft, n_mels=n_mels)).I
@@ -169,8 +181,8 @@ class SDAETrainer(NetworkTrainer):
             # convert the power spectrum to db for better visualization
             spec = np.dot(mel_basis_inv, mel_spec)
             img = librosa.power_to_db(spec, ref=np.max)
-            out_imgs.append(img)
-        return np.asarray(out_imgs)  # shape : num_imgs x height x width
+            out_imgs.append(torch.from_numpy(img).float())
+        return out_imgs
 
     def test(self):
         """Test with test dataset."""
