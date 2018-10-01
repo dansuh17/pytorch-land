@@ -181,7 +181,8 @@ class SDAETrainer(NetworkTrainer):
             # convert the power spectrum to db for better visualization
             spec = np.dot(mel_basis_inv, mel_spec)
             img = librosa.power_to_db(spec, ref=np.max)
-            out_imgs.append(torch.from_numpy(img).float())
+            height, width = img.shape
+            out_imgs.append(torch.from_numpy(img).float().view(1, height, width))
         return out_imgs
 
     def test(self):
