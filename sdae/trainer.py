@@ -1,5 +1,7 @@
 import math
 import os
+import librosa
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -98,10 +100,11 @@ class SDAETrainer(NetworkTrainer):
         No parameters are updated if train=False.
         """
         losses = []
-        for oimg, cimg in dataloader:  # original images / corrupted images pairs
+        dataloader_size = len(dataloader)
+        for step, img_pair in enumerate(dataloader):  # original images / corrupted images pairs
             # cast to FloatTensor (the images have been falsely converted to DoubleTensor)
-            oimg = oimg.float().to(self.device)
-            cimg = cimg.float().to(self.device)
+            oimg = img_pair[0].float().to(self.device)
+            cimg = img_pair[1].float().to(self.device)
 
             out = self.sdae(cimg)
             loss = self.criterion(out, oimg)
@@ -128,18 +131,46 @@ class SDAETrainer(NetworkTrainer):
                 self.step += 1
             else:  # validation / test epoch
                 losses.append(loss.item())
+
                 # save example images
-                grid_input = torchvision.utils.make_grid(
-                    cimg[:4, :].view(-1, 1, self.input_width, self.input_height), nrow=4, normalize=True)
-                grid_output = torchvision.utils.make_grid(
-                    out[:4, :].view(-1, 1, self.input_width, self.input_height), nrow=4, normalize=True)
-                self.summ_writer.add_image(
-                    '{}/input'.format(self.epoch), grid_input, self.step)
-                self.summ_writer.add_image(
-                    '{}/output'.format(self.epoch), grid_output, self.step)
+                nrow = 4
+                if step == dataloader_size - 1:  # save only at the end of epoch
+                    self.add_image(oimg, nrow, self.input_height, self.input_width, name='clean')
+                    self.add_image(cimg, nrow, self.input_height, self.input_width, name='noisy')
+                    self.add_image(out, nrow, self.input_height, self.input_width, name='output')
 
         avg_loss = sum(losses) / len(losses)
         return avg_loss
+
+    def add_image(self, img, nrow, height, width, name: str):
+        """
+        Add image grid to summary writer.
+
+        Args:
+            img (torch.FloatTensor): float tensor representation of the image
+            nrow (int): number of images to be shown
+            height (int): height of single image
+            width (int): width of single image
+            name (str): display name
+        """
+        spec = self.make_grid_from_mel(img[:nrow, :].view(-1, 1, height, width))
+        grid = torchvision.utils.make_grid(spec, nrow=nrow, normalize=True)
+        self.summ_writer.add_image('{}/{}'.format(self.epoch, name), grid, self.step)
+
+    @staticmethod
+    def make_grid_from_mel(imgs, sr=16000, n_fft=256, n_mels=40):  # TODO: acquire these from constants
+        # TODO: make this static resource
+        # inverse of mel spectrogram matrix that can revert mel-spec to power-spectrogram
+        mel_basis_inv = np.matrix(librosa.filters.mel(sr, n_fft, n_mels=n_mels)).I
+        # convert torch Tensor to numpy.ndarray
+        imgs = imgs.cpu().numpy()
+        out_imgs = []
+        for mel_spec in imgs:
+            # convert the power spectrum to db for better visualization
+            spec = np.dot(mel_basis_inv, mel_spec)
+            img = librosa.power_to_db(spec, ref=np.max)
+            out_imgs.append(img)
+        return np.asarray(out_imgs)  # shape : num_imgs x height x width
 
     def test(self):
         """Test with test dataset."""
