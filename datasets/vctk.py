@@ -273,3 +273,10 @@ if __name__ == '__main__':
         out_path=out_path,
         noisy_dir=NOISY_TESTSET_WAV,
         clean_dir=CLEAN_TESTSET_WAV)
+
+    # # TODO: temp : only for testing
+    # noisy_vctk_preprocess(
+    #     in_path='test',
+    #     out_path='test/test_processed',
+    #     noisy_dir=NOISY_TESTSET_WAV,
+    #     clean_dir=CLEAN_TESTSET_WAV)

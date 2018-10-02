@@ -1,6 +1,7 @@
 ### general
 tags
 venv/
+test/
 
 ### OSX
 ._*

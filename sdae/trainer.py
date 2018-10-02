@@ -50,13 +50,34 @@ class SDAETrainer(NetworkTrainer):
             load_vctk_dataloaders(datapath, self.batch_size)
         print('Dataloader created')
 
-        sdae = SDAE(input_dim=self.input_dim).to(self.device)
-        self.sdae = torch.nn.parallel.DataParallel(sdae, device_ids=self.device_ids)
-        print('Model created')
-        print(self.sdae)
+        resume = True
+        if resume:
+            states = self.load_checkpoint('speech_denoise_model_e399.pth')
+            self.sdae = states['model']
+            print('Model created')
+            print(self.sdae)
 
-        self.optimizer = optim.Adam(params=self.sdae.parameters(), lr=self.lr_init)
-        print('Optimizer created')
+            self.optimizer = states['optimizer']
+            print('Optimizer created')
+
+            self.seed = states['seed']
+            torch.manual_seed(self.seed)
+            print('seed set to : {}'.format(self.seed))
+
+            self.epoch = states['epoch']
+            self.step = states['step']
+        else:
+            sdae = SDAE(input_dim=self.input_dim).to(self.device)
+            self.sdae = torch.nn.parallel.DataParallel(sdae, device_ids=self.device_ids)
+            print('Model created')
+            print(self.sdae)
+
+            self.optimizer = optim.Adam(params=self.sdae.parameters(), lr=self.lr_init)
+            print('Optimizer created')
+
+            self.epoch = 0
+            self.step = 0
+            print('Starting from - epoch : {}, step: {}'.format(self.epoch, self.step))
 
         self.summ_writer = SummaryWriter(log_dir=self.log_dir)
         print('Summary Writer created')
@@ -67,10 +88,6 @@ class SDAETrainer(NetworkTrainer):
         self.lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(
             self.optimizer, mode='min', verbose=True, factor=0.2, patience=7)
         print('LR scheduler created')
-
-        self.epoch = 0
-        self.step = 0
-        print('Starting from - epoch : {}, step: {}'.format(self.epoch, self.step))
 
     def train(self):
         """The entire training session."""
@@ -175,14 +192,14 @@ class SDAETrainer(NetworkTrainer):
         # inverse of mel spectrogram matrix that can revert mel-spec to power-spectrogram
         mel_basis_inv = np.matrix(librosa.filters.mel(sr, n_fft, n_mels=n_mels)).I
         # convert torch Tensor to numpy.ndarray
-        imgs = imgs.cpu().numpy()
+        imgs = imgs.cpu().detach().numpy()
         out_imgs = []
         for mel_spec in imgs:
             # convert the power spectrum to db for better visualization
             spec = np.dot(mel_basis_inv, mel_spec)
             img = librosa.power_to_db(spec, ref=np.max)
             height, width = img.shape
-            out_imgs.append(torch.from_numpy(img).float().view(1, height, width))
+            out_imgs.append(torch.from_numpy(img).float().view(-1, height, width))
         return out_imgs
 
     def test(self):
@@ -208,6 +225,10 @@ class SDAETrainer(NetworkTrainer):
             'model': self.sdae.state_dict(),
             'optimizer': self.optimizer.state_dict(),
         }, checkpoint_path)
+
+    def load_checkpoint(self, filename: str):
+        checkpoint_path = os.path.join(self.models_dir, filename)
+        return torch.load(checkpoint_path)
 
     def cleanup(self):
         self.summ_writer.close()
