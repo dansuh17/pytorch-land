@@ -82,7 +82,7 @@ class SDAETrainer(NetworkTrainer):
             self.step = 0
             print('Starting from - epoch : {}, step: {}'
                   .format(self.epoch, self.step))
-        self.model_name = self.sdae.__class__.__name__
+        self.model_name = self.sdae.module.__class__.__name__
 
         self.summ_writer = SummaryWriter(log_dir=self.log_dir)
         print('Summary Writer created')
@@ -120,7 +120,7 @@ class SDAETrainer(NetworkTrainer):
 
             # save checkpoint
             checkpoint_name = '{}_checkpoint_e{}.pth'.format(self.model_name, self.epoch)
-            self.save_checkpoint(os.path.join(self.models_dir, checkpoint_name))
+            self.save_checkpoint(checkpoint_name)
         # test
         self.test()
 
