@@ -23,11 +23,11 @@ import re
 import os
 import random
 import math
-import scipy
 import librosa
 import numpy as np
 from torch.utils.data import Dataset, DataLoader, sampler
 from tqdm import tqdm
+from utils.spectrogram import split_spectrogram
 
 
 N_MELS = 40  # number of mel filters
@@ -171,63 +171,34 @@ def noisy_vctk_preprocess(
         noisy_counterpart_path = os.path.join(in_path, noisy_dir, fname)
 
         # read the audio file
-        clean_y, _ = librosa.load(full_path, sr=target_sr)  # resample as it reads
-        noisy_y, _ = librosa.load(noisy_counterpart_path, sr=target_sr)
+        clean_y, clean_sr = librosa.load(full_path, sr=target_sr)  # resample as it reads
+        noisy_y, noisy_sr = librosa.load(noisy_counterpart_path, sr=target_sr)
 
-        # create mel-spectrogram - TODO: deprecated option?
+        # create mel-spectrogram. perform stft otherwise
         if mel:
             # shape=(n_mels, t)
             clean_spec = librosa.feature.melspectrogram(
                 clean_y, sr=target_sr, n_fft=window_size, hop_length=hop_size, n_mels=N_MELS)
             noisy_spec = librosa.feature.melspectrogram(
                 noisy_y, sr=target_sr, n_fft=window_size, hop_length=hop_size, n_mels=N_MELS)
+        else:
+            # shape=(n_fft // 2 + 1, t)
+            if clean_sr != target_sr:
+                clean_y = librosa.core.resample(clean_y, clean_sr, target_sr)
+            clean_spec = librosa.core.stft(clean_y, n_fft=window_size, hop_length=hop_size)
+            if noisy_sr != target_sr:
+                noisy_y = librosa.core.resample(noisy_y, clean_sr, target_sr)
+            noisy_spec = librosa.core.stft(noisy_y, n_fft=window_size, hop_length=hop_size)
 
-            # split the spectrogram by 'split_size'-frames-sized chunks
-            clean_split = _split_spectrogram(clean_spec, chunk_size=split_size)
-            noisy_split = _split_spectrogram(noisy_spec, chunk_size=split_size)
+        # split the spectrogram by 'split_size'-frames-sized chunks
+        clean_split = split_spectrogram(clean_spec, chunk_size_in_frames=split_size)
+        noisy_split = split_spectrogram(noisy_spec, chunk_size_in_frames=split_size)
 
-            # save each clean-noisy pairs of chunks to file
-            for split_id, split_pair in enumerate(zip(clean_split, noisy_split)):
-                out_fname = '{}_s{:04}'.format(wav_id, split_id)
-                np.save(os.path.join(out_dir, out_fname),
-                        np.asarray(split_pair))
-
-
-def inverse_mel(mel_spec, sr: int, n_fft: int):
-    """
-    Inverse mel-spectrum
-
-    Args:
-        mel_spec: mel spectrogram
-        sr (int): sample rate
-        n_fft (int): number of fft bins
-
-    Returns:
-        ys: signal as a result of inverse fft
-    """
-    # stitch together
-    mel_basis = librosa.filters.mel(sr, n_fft, n_mels=N_MELS)
-    power_spec = np.dot(np.matrix(mel_basis).I, mel_spec)
-    _, ys = scipy.signal.istft(power_spec, fs=sr)
-    return ys
-
-
-def _split_spectrogram(spec, chunk_size: int):
-    """
-    Splits spectrogram into chunks that have sizes of
-    'chunk_size' in the time axis.
-
-    Args:
-        spec (np.ndarray): spectrogram represented as 2D array
-        chunk_size (int): number of frames to split into
-
-    Returns:
-        split_spec = list of np.ndarray's representing chunks having ``chunk_size`` sizes
-    """
-    time_length = spec.shape[1]
-    num_chunks = time_length // chunk_size
-    spec = spec[:, :num_chunks * chunk_size]
-    return np.hsplit(spec, num_chunks)
+        # save each clean-noisy pairs of chunks to file
+        for split_id, split_pair in enumerate(zip(clean_split, noisy_split)):
+            out_fname = '{}_s{:04}'.format(wav_id, split_id)
+            np.save(os.path.join(out_dir, out_fname),
+                    np.asarray(split_pair))
 
 
 class NoisyVCTKSpectrogram(Dataset):
@@ -254,9 +225,10 @@ class NoisyVCTKSpectrogram(Dataset):
         return len(self.data)
 
 
-if __name__ == '__main__':
+def preprocess():
     # run this script in order to preprocess the dataset
     path = os.path.join(os.path.dirname(__file__))
+
     dataset_path = os.path.join(path, 'vctk_corpus')
     unpack_dataset('DS_10283_2791.zip', out_path=dataset_path)
 
@@ -274,9 +246,35 @@ if __name__ == '__main__':
         noisy_dir=NOISY_TESTSET_WAV,
         clean_dir=CLEAN_TESTSET_WAV)
 
-    # # TODO: temp : only for testing
+    ### UNCOMMENT BELOW TO PROCESS ORIGINAL SPECTROGRAMS FOR TRAINING SET
+    # create spectrogram data also - used for waveform recovery
+    # out_path_spectrogram = 'vctk_spectrogram'
+    # noisy_vctk_preprocess(
+    #     in_path=dataset_path,
+    #     out_path=out_path_spectrogram,
+    #     noisy_dir=NOISY_TRAINSET_DIR,
+    #     clean_dir=CLEAN_TRAINSET_DIR,
+    #     mel=False)
+    noisy_vctk_preprocess(
+        in_path=dataset_path,
+        out_path=out_path,
+        noisy_dir=NOISY_TESTSET_WAV,
+        clean_dir=CLEAN_TESTSET_WAV,
+        mel=False)
+
+
+if __name__ == '__main__':
+    preprocess()
+
+    ### uncomment this for extracting local test set
     # noisy_vctk_preprocess(
     #     in_path='test',
     #     out_path='test/test_processed',
     #     noisy_dir=NOISY_TESTSET_WAV,
     #     clean_dir=CLEAN_TESTSET_WAV)
+    # noisy_vctk_preprocess(
+    #     in_path='test',
+    #     out_path='test/test_processed_spectrogram',
+    #     noisy_dir=NOISY_TESTSET_WAV,
+    #     clean_dir=CLEAN_TESTSET_WAV,
+    #     mel=False)
