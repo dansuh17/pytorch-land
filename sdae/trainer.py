@@ -82,6 +82,7 @@ class SDAETrainer(NetworkTrainer):
             self.step = 0
             print('Starting from - epoch : {}, step: {}'
                   .format(self.epoch, self.step))
+        self.model_name = self.sdae.__class__.__name__
 
         self.summ_writer = SummaryWriter(log_dir=self.log_dir)
         print('Summary Writer created')
@@ -108,7 +109,7 @@ class SDAETrainer(NetworkTrainer):
                 dummy_input = torch.randn((10, 1, self.input_dim)).to(self.device)
                 self.save_module(
                     self.sdae.module,
-                    os.path.join(self.models_dir, '{}.onnx'.format(type(self.sdae.module))),
+                    os.path.join(self.models_dir, '{}.onnx'.format(self.model_name)),
                     save_onnx=True,
                     dummy_input=dummy_input)
 
@@ -118,7 +119,7 @@ class SDAETrainer(NetworkTrainer):
             self.epoch += 1
 
             # save checkpoint
-            checkpoint_name = '{}_checkpoint_e{}.pth'.format(type(self.sdae.module), self.epoch)
+            checkpoint_name = '{}_checkpoint_e{}.pth'.format(self.model_name, self.epoch)
             self.save_checkpoint(os.path.join(self.models_dir, checkpoint_name))
         # test
         self.test()
@@ -154,7 +155,7 @@ class SDAETrainer(NetworkTrainer):
                         self.sdae.module,
                         os.path.join(
                             self.models_dir,
-                            '{}_model_e{}.pth'.format(type(self.sdae.module), self.epoch)))
+                            '{}_model_e{}.pth'.format(self.model_name, self.epoch)))
                     self.save_module_summary(
                         self.summ_writer, self.sdae, self.step, save_histogram=False)
 

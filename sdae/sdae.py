@@ -122,3 +122,5 @@ if __name__ == '__main__':
     dummy_input = torch.randn((10, 1, input_size))
     output = net(dummy_input)
     print(output.size())
+
+    print(net.__class__.__name__)
