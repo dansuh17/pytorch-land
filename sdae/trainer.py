@@ -7,7 +7,7 @@ import torch.nn as nn
 import torch.optim as optim
 import torchvision.utils
 from base_trainer import NetworkTrainer
-from .sdae import SDAE
+from .sdae import GeneralizedSDAE
 # from datasets.noisy_mnist import load_noisy_mnist_dataloader
 from datasets.vctk import load_vctk_dataloaders
 from tensorboardX import SummaryWriter
@@ -50,7 +50,7 @@ class SDAETrainer(NetworkTrainer):
             load_vctk_dataloaders(datapath, self.batch_size)
         print('Dataloader created')
 
-        resume = True
+        resume = False
         if resume:
             states = self.load_checkpoint('speech_denoise_model_e399.pth')
             self.sdae = states['model']
@@ -67,17 +67,21 @@ class SDAETrainer(NetworkTrainer):
             self.epoch = states['epoch']
             self.step = states['step']
         else:
-            sdae = SDAE(input_dim=self.input_dim).to(self.device)
-            self.sdae = torch.nn.parallel.DataParallel(sdae, device_ids=self.device_ids)
+            sdae = GeneralizedSDAE(
+                input_dim=self.input_dim, num_stacks=5).to(self.device)
+            self.sdae = torch.nn.parallel.DataParallel(
+                sdae, device_ids=self.device_ids)
             print('Model created')
             print(self.sdae)
 
-            self.optimizer = optim.Adam(params=self.sdae.parameters(), lr=self.lr_init)
+            self.optimizer = optim.Adam(
+                params=self.sdae.parameters(), lr=self.lr_init)
             print('Optimizer created')
 
             self.epoch = 0
             self.step = 0
-            print('Starting from - epoch : {}, step: {}'.format(self.epoch, self.step))
+            print('Starting from - epoch : {}, step: {}'
+                  .format(self.epoch, self.step))
 
         self.summ_writer = SummaryWriter(log_dir=self.log_dir)
         print('Summary Writer created')
@@ -102,13 +106,20 @@ class SDAETrainer(NetworkTrainer):
                 best_loss = train_loss
                 # save best model in onnx format
                 dummy_input = torch.randn((10, 1, self.input_dim)).to(self.device)
-                self.save_module(self.sdae.module, os.path.join(self.models_dir, 'speech_denoise.onnx'),
-                                 save_onnx=True, dummy_input=dummy_input)
+                self.save_module(
+                    self.sdae.module,
+                    os.path.join(self.models_dir, '{}.onnx'.format(type(self.sdae.module))),
+                    save_onnx=True,
+                    dummy_input=dummy_input)
 
             # validate
             val_loss = self.validate()
             self.lr_scheduler.step(val_loss)
             self.epoch += 1
+
+            # save checkpoint
+            checkpoint_name = '{}_checkpoint_e{}.pth'.format(type(self.sdae.module), self.epoch)
+            self.save_checkpoint(os.path.join(self.models_dir, checkpoint_name))
         # test
         self.test()
 
@@ -140,8 +151,10 @@ class SDAETrainer(NetworkTrainer):
                 if self.step % 500 == 0:  # save models and their info
                     # save the module in onnx format
                     self.save_module(
-                        self.sdae.module, os.path.join(
-                            self.models_dir, 'speech_denoise_model_e{}.pth'.format(self.epoch)))
+                        self.sdae.module,
+                        os.path.join(
+                            self.models_dir,
+                            '{}_model_e{}.pth'.format(type(self.sdae.module), self.epoch)))
                     self.save_module_summary(
                         self.summ_writer, self.sdae, self.step, save_histogram=False)
 
@@ -152,9 +165,12 @@ class SDAETrainer(NetworkTrainer):
                 # save example images
                 nrow = 4
                 if step == dataloader_size - 1:  # save only at the end of epoch
-                    self.add_image(oimg, nrow, self.input_height, self.input_width, name='clean')
-                    self.add_image(cimg, nrow, self.input_height, self.input_width, name='noisy')
-                    self.add_image(out, nrow, self.input_height, self.input_width, name='output')
+                    self.add_image(
+                        oimg, nrow, self.input_height, self.input_width, name='clean')
+                    self.add_image(
+                        cimg, nrow, self.input_height, self.input_width, name='noisy')
+                    self.add_image(
+                        out, nrow, self.input_height, self.input_width, name='output')
 
         avg_loss = sum(losses) / len(losses)
         return avg_loss
@@ -211,9 +227,12 @@ class SDAETrainer(NetworkTrainer):
         """Validation step."""
         with torch.no_grad():
             val_loss = self.run_epoch(self.val_dataloader, train=False)
-            print('Epoch (validate): {:03}  Step: {:06}  Loss: {:.06f}'
-                  .format(self.epoch, self.step, val_loss))
-            self.summ_writer.add_scalar('validate/loss', val_loss, self.step)
+            self.log_performance(
+                self.summ_writer,
+                {'loss': val_loss},
+                self.epoch,
+                self.step,
+                summary_group='validate')
         return val_loss
 
     def save_checkpoint(self, filename: str):
@@ -221,7 +240,7 @@ class SDAETrainer(NetworkTrainer):
         torch.save({
             'epoch': self.epoch,
             'step': self.step,
-            'seed': self.seed,
+            'pytorch_seed': self.seed,
             'model': self.sdae.state_dict(),
             'optimizer': self.optimizer.state_dict(),
         }, checkpoint_path)

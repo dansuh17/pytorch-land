@@ -48,7 +48,6 @@ class GeneralizedSDAE(nn.Module):
     that can have arbitrary number of stacked linear layers
     and arbitrary input sizes.
     """
-    # TODO: implement
     def __init__(self, input_dim: int, feature_size=100, num_stacks=3):
         super().__init__()
         # feature_size should be smaller, unless it has sparse condition, which is not implemented here
