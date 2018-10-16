@@ -113,8 +113,8 @@ if __name__ == '__main__':
     print('Output size')
     print(out.size())
 
-    net = SchmidtSDA(1, 11, 40)
-    dummy_sample = torch.randn((10, 1, 11, 40))
+    net = SchmidtSDA(1, 40, 11)
+    dummy_sample = torch.randn((10, 1, 40, 11))
     out, z = net(dummy_sample)
     print('Z size')
     print(z.size())

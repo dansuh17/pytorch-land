@@ -1,4 +1,6 @@
 import os
+import librosa
+import numpy as np
 import math
 import torch
 import torch.nn as nn
@@ -87,9 +89,10 @@ class SchimdtSDATrainer(NetworkTrainer):
 
     def run_epoch(self, dataloader, train=True):
         losses = []
-        for clean_img, noisy_img in dataloader:
-            clean_img, noisy_img =\
-                clean_img.float().to(self.device), noisy_img.float().to(self.device)
+        dataloader_size = len(dataloader)
+        for step, img_pairs in enumerate(dataloader):
+            clean_img = img_pairs[0].float().to(self.device)
+            noisy_img = img_pairs[1].float().to(self.device)
 
             output, _ = self.dae(noisy_img)  # latent vector not used
             loss = self.criterion(output, clean_img)
@@ -114,6 +117,16 @@ class SchimdtSDATrainer(NetworkTrainer):
                 self.step += 1
             else:  # validation
                 losses.append(loss.item())
+
+                # save example images
+                nrow = 4
+                if step == dataloader_size - 1:  # save only at the end of epoch
+                    self.add_image(
+                        clean_img, nrow, self.input_height, self.input_width, name='clean')
+                    self.add_image(
+                        noisy_img, nrow, self.input_height, self.input_width, name='noisy')
+                    self.add_image(
+                        output, nrow, self.input_height, self.input_width, name='output')
                 # print 4 images in a row
                 grid_input = torchvision.utils.make_grid(noisy_img[:4, :], nrow=4, normalize=True)
                 grid_output = torchvision.utils.make_grid(output[:4, :], nrow=4, normalize=True)
@@ -124,6 +137,49 @@ class SchimdtSDATrainer(NetworkTrainer):
 
         avg_loss = sum(losses) / len(losses)
         return avg_loss
+
+    def add_image(self, img, nrow, height, width, name: str):
+        """
+        Add image grid to summary writer.
+
+        Args:
+            img (torch.FloatTensor): float tensor representation of the image
+            nrow (int): number of images to be shown
+            height (int): height of single image
+            width (int): width of single image
+            name (str): display name
+        """
+        spec = self.make_grid_from_mel(img[:nrow, :].view(-1, 1, height, width))
+        grid = torchvision.utils.make_grid(spec, nrow=nrow, normalize=True)
+        self.writer.add_image('{}/{}'.format(self.epoch, name), grid, self.step)
+
+    @staticmethod
+    def make_grid_from_mel(imgs, sr=16000, n_fft=256, n_mels=40):  # TODO: acquire these from constants
+        """
+        Make image grid from a number of mel-spectrograms.
+
+        Args:
+            imgs (torch.FloatTensor): tensor of images
+            sr (int): sample rate
+            n_fft (int): num_fft
+            n_mels (int): number of mel-spectrogram bins
+
+        Returns:
+            list of tensors representing images
+        """
+        # TODO: make this static resource
+        # inverse of mel spectrogram matrix that can revert mel-spec to power-spectrogram
+        mel_basis_inv = np.matrix(librosa.filters.mel(sr, n_fft, n_mels=n_mels)).I
+        # convert torch Tensor to numpy.ndarray
+        imgs = imgs.cpu().detach().numpy()
+        out_imgs = []
+        for mel_spec in imgs:
+            # convert the power spectrum to db for better visualization
+            spec = np.dot(mel_basis_inv, mel_spec)
+            img = librosa.power_to_db(spec, ref=np.max)
+            height, width = img.shape
+            out_imgs.append(torch.from_numpy(img).float().view(-1, height, width))
+        return out_imgs
 
     def validate(self):
         val_loss = self.run_epoch(self.val_dataloader, train=False)
