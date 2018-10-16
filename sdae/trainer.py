@@ -182,8 +182,8 @@ class SDAETrainer(NetworkTrainer):
         Args:
             img (torch.FloatTensor): float tensor representation of the image
             nrow (int): number of images to be shown
-            height (int): height of single image
-            width (int): width of single image
+            height (int): height of image (here it is the number of mel banks)
+            width (int): width of single image (here this is the number of frames)
             name (str): display name
         """
         spec = self.make_grid_from_mel(img[:nrow, :].view(-1, 1, height, width))

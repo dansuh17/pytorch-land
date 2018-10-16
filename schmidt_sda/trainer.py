@@ -44,8 +44,10 @@ class SchimdtSDATrainer(NetworkTrainer):
 
         self.dae = SchmidtSDA(
             input_channel=1,
+            input_height=self.input_height,
             input_width=self.input_width,
-            input_height=self.input_height).to(self.device)
+        ).to(self.device)
+
         self.dae = torch.nn.parallel.DataParallel(self.dae, device_ids=self.device_ids)
         print('Model created')
         print(self.dae)
@@ -74,7 +76,7 @@ class SchimdtSDATrainer(NetworkTrainer):
             if best_loss > train_loss:
                 best_loss = train_loss
                 dummy_input = torch.randn(
-                    (4, 1, self.input_width, self.input_height)
+                    (4, 1, self.input_height, self.input_width)
                 ).to(self.device)
                 onnx_path = os.path.join(self.model_dir, 'schmidt_sda.onnx')
                 # TODO: no symbol for max_pool2d_with_indices
@@ -145,8 +147,8 @@ class SchimdtSDATrainer(NetworkTrainer):
         Args:
             img (torch.FloatTensor): float tensor representation of the image
             nrow (int): number of images to be shown
-            height (int): height of single image
-            width (int): width of single image
+            height (int): height of image (here it is the number of mel banks)
+            width (int): width of single image (here this is the number of frames)
             name (str): display name
         """
         spec = self.make_grid_from_mel(img[:nrow, :].view(-1, 1, height, width))

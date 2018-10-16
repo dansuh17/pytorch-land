@@ -8,12 +8,16 @@ class SchmidtSDA(nn.Module):
 
     See Also: Schmidt et al. "Stacked Denoising and Stacked Convolutional Autoencoders" (2017)
     """
-    def __init__(self, input_channel: int, input_width: int, input_height: int):
+    def __init__(self, input_channel: int, input_height: int, input_width: int):
         super().__init__()
         self.input_width = input_width
         self.input_height = input_height
+
+        # default pooling layer configuration
         self.pool_kernel_size = 2
         self.pool_kernel_stride = 2
+
+        # calculate the dimensions after the pooling layer
         self.after_pool_width = (input_width - self.pool_kernel_size) // self.pool_kernel_stride + 1
         self.after_pool_height = (input_height - self.pool_kernel_size) // self.pool_kernel_stride + 1
         self.after_pool_channels = 16
@@ -85,13 +89,13 @@ class SchmidtSDA(nn.Module):
         x = self.unpool(
             x.view(-1,
                    self.after_pool_channels,
-                   self.after_pool_width,
-                   self.after_pool_height),
+                   self.after_pool_height,
+                   self.after_pool_width),
             pool_indices,
             output_size=(-1,
                          self.after_pool_channels,
-                         self.input_width,
-                         self.input_height))
+                         self.input_height,
+                         self.input_width))
         return self.decoder_conv(x), z
 
     @staticmethod
