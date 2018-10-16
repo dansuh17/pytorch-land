@@ -24,6 +24,7 @@ class SchimdtSDATrainer(NetworkTrainer):
         os.makedirs(self.log_dir, exist_ok=True)
         os.makedirs(self.model_dir, exist_ok=True)
 
+        # parse
         self.input_width = config['input_width']
         self.input_height = config['input_height']
         self.batch_size = config['batch_size']
@@ -143,10 +144,12 @@ class SchimdtSDATrainer(NetworkTrainer):
 
 if __name__ == '__main__':
     import json
+    from datasets.vctk import VCTKLoaderMaker
+
     dirpath = os.path.dirname(__file__)
-    with open(os.path.join(dirpath, 'config.json'), 'r') as configf:
+    with open(os.path.join(dirpath, 'config_vctk.json'), 'r') as configf:
         config = json.loads(configf.read())
 
-    trainer = SchimdtSDATrainer(config)
+    trainer = SchimdtSDATrainer(config, VCTKLoaderMaker)
     trainer.train()
     trainer.cleanup()
