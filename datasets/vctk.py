@@ -46,15 +46,15 @@ NOISY_TRAINSET_DIR = 'noisy_trainset'
 
 class VCTKLoaderMaker(DataLoaderMaker):
     """Class that helps creating DataLoader instances for VCTK dataset."""
-    def __init__(self, data_path: str, batch_size: int, num_workers=4):
+    def __init__(self, data_path: str, batch_size: int, num_workers=4, use_channel=False):
         super().__init__()
         self.batch_size = batch_size
         self.num_workers = num_workers
 
         # create datasets
-        self.train_dataset = NoisyVCTKSpectrogram(data_path)
-        self.validate_dataset = NoisyVCTKSpectrogram(data_path)
-        self.test_dataset = NoisyVCTKSpectrogram(data_path)
+        self.train_dataset = NoisyVCTKSpectrogram(data_path, use_channel)
+        self.validate_dataset = NoisyVCTKSpectrogram(data_path, use_channel)
+        self.test_dataset = NoisyVCTKSpectrogram(data_path, use_channel)
 
         # calculate indices out of dataset size
         num_data = len(self.train_dataset)
@@ -106,7 +106,7 @@ def load_vctk_dataloaders(data_path: str, batch_size: int):
     Load VCTK dataset (in whatever form) dataloaders.
 
     Args:
-        data_path (str): data path whtere datasets are located
+        data_path (str): data path where datasets are located
         batch_size (int): size of batch
 
     Returns:
@@ -200,6 +200,8 @@ def noisy_vctk_preprocess(
     Preprocessed files are extracted in `.npy` format that contains
     clean, noisy spectrogram pairs.
 
+    Each mel spectrogram has size of (n_mel, split_size).
+
     Args:
         in_path (str): input directory
         out_path (str): desired output directory
@@ -264,8 +266,15 @@ class NoisyVCTKSpectrogram(Dataset):
     Dataset for VCTK dataset that has been preprocessed into mel-spectrogram chunks.
     The dataset returns pairs of clean and noisy mel-spectrograms.
     """
-    def __init__(self, data_path: str):
+    def __init__(self, data_path: str, use_channel=False):
+        """
+        Args:
+            data_path (str): data path
+            use_channel (bool): add a channel dimension if True
+        """
         super().__init__()
+        self.use_channel = use_channel
+
         data = []
         for speaker_id in os.listdir(data_path):
             speaker_data_dir = os.path.join(data_path, speaker_id)
@@ -276,6 +285,9 @@ class NoisyVCTKSpectrogram(Dataset):
 
     def __getitem__(self, idx):
         pair = np.load(self.data[idx])
+        # add a channel dimension at the first (index 0) dimension
+        if self.use_channel:
+            return pair[0][np.newaxis, :], pair[1][np.newaxis, :]
         # return clean, noisy pair
         return pair[0], pair[1]
 

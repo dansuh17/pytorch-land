@@ -4,14 +4,18 @@ from torch import nn
 
 class SchmidtSDA(nn.Module):
     """
-    Stacked convolutional autoencoder implementation.
+    Stacked convolutional denoising autoencoder implementation.
 
     See Also: Schmidt et al. "Stacked Denoising and Stacked Convolutional Autoencoders" (2017)
     """
     def __init__(self, input_channel: int, input_width: int, input_height: int):
         super().__init__()
-        self.after_pool_width = (input_width - 1) // 2 + 1
-        self.after_pool_height = (input_height - 1) // 2 + 1
+        self.input_width = input_width
+        self.input_height = input_height
+        self.pool_kernel_size = 2
+        self.pool_kernel_stride = 2
+        self.after_pool_width = (input_width - self.pool_kernel_size) // self.pool_kernel_stride + 1
+        self.after_pool_height = (input_height - self.pool_kernel_size) // self.pool_kernel_stride + 1
         self.after_pool_channels = 16
 
         self.linear_in = \
@@ -28,7 +32,10 @@ class SchmidtSDA(nn.Module):
             nn.ReLU(inplace=True),
             nn.Conv2d(16, 16, 3, padding=1),
             nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=2, stride=2, return_indices=True),  # useful when unpooling
+            nn.MaxPool2d(
+                kernel_size=self.pool_kernel_size,
+                stride=self.pool_kernel_stride,
+                return_indices=True),  # useful when unpooling
         )
         # fc part of encoder
         self.encoder_comp = nn.Sequential(
@@ -81,13 +88,16 @@ class SchmidtSDA(nn.Module):
                    self.after_pool_width,
                    self.after_pool_height),
             pool_indices,
-            output_size=(-1, self.after_pool_channels, self.before_pool, self.before_pool))
+            output_size=(-1,
+                         self.after_pool_channels,
+                         self.input_width,
+                         self.input_height))
         return self.decoder_conv(x), z
 
     @staticmethod
     def init_weights(m):
         if isinstance(m, nn.Conv2d):
-            nn.init.kaiming_normal_(m.weight)
+            nn.init.kaiming_normal_(m.weight)  # He init (model is using ReLU)
             nn.init.constant_(m.bias, 0)
         if isinstance(m, nn.Linear):
             nn.init.kaiming_normal_(m.weight)
@@ -95,11 +105,21 @@ class SchmidtSDA(nn.Module):
 
 
 if __name__ == '__main__':
-    net = SchmidtSDA(1, 32)
+    net = SchmidtSDA(1, 32, 32)
     dummy_sample = torch.randn((10, 1, 32, 32))
-    z, out = net(dummy_sample)
+    out, z = net(dummy_sample)
+    print('Z size')
+    print(z.size())
+    print('Output size')
     print(out.size())
 
-    for name, param in net.named_parameters():
-        print(name)
-        print(param)
+    net = SchmidtSDA(1, 11, 40)
+    dummy_sample = torch.randn((10, 1, 11, 40))
+    out, z = net(dummy_sample)
+    print('Z size')
+    print(z.size())
+    print('Output size')
+    print(out.size())
+    # for name, param in net.named_parameters():
+    #     print(name)
+    #     print(param)

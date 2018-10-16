@@ -4,7 +4,6 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torchvision
-from datasets.noisy_mnist import load_noisy_mnist_dataloader
 from datasets.loader_maker import DataLoaderMaker
 from .schmidt_sda import SchmidtSDA
 from base_trainer import NetworkTrainer
@@ -35,13 +34,10 @@ class SchimdtSDATrainer(NetworkTrainer):
         print('Summary Writer Created')
 
         # create dataloaders
-        loadermaker = loadermaker_cls(self.input_data_dir, self.batch_size)
+        loadermaker = loadermaker_cls(self.input_data_dir, self.batch_size, use_channel=True)
         self.train_dataloader = loadermaker.make_train_dataloader()
         self.val_dataloader = loadermaker.make_validate_dataloader()
         self.test_dataloader = loadermaker.make_test_dataloader()
-
-        self.train_dataloader, self.val_dataloader, self.test_dataloader = \
-            load_noisy_mnist_dataloader(self.batch_size)
         print('Dataloaders created')
 
         self.dae = SchmidtSDA(
@@ -92,7 +88,8 @@ class SchimdtSDATrainer(NetworkTrainer):
     def run_epoch(self, dataloader, train=True):
         losses = []
         for clean_img, noisy_img in dataloader:
-            clean_img, noisy_img = clean_img.to(self.device), noisy_img.to(self.device)
+            clean_img, noisy_img =\
+                clean_img.float().to(self.device), noisy_img.float().to(self.device)
 
             output, _ = self.dae(noisy_img)  # latent vector not used
             loss = self.criterion(output, clean_img)
