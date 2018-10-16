@@ -4,13 +4,19 @@ from torch import nn
 
 class SchmidtSDA(nn.Module):
     """
-    Schmid et al. "Stacked Denoising and Stacked Convolutional Autoencoders" (2017)
+    Stacked convolutional autoencoder implementation.
+
+    See Also: Schmidt et al. "Stacked Denoising and Stacked Convolutional Autoencoders" (2017)
     """
-    def __init__(self, input_channel: int, input_dim: int):
+    def __init__(self, input_channel: int, input_width: int, input_height: int):
         super().__init__()
-        self.after_pool = (input_dim - 1) // 2 + 1
-        self.before_pool = input_dim
-        self.linear_in = self.after_pool * self.after_pool * 16
+        self.after_pool_width = (input_width - 1) // 2 + 1
+        self.after_pool_height = (input_height - 1) // 2 + 1
+        self.after_pool_channels = 16
+
+        self.linear_in = \
+            self.after_pool_width * self.after_pool_height * self.after_pool_channels
+
         self.encoder_conv = nn.Sequential(
             nn.Conv2d(in_channels=input_channel, out_channels=4, kernel_size=3, padding=1),
             nn.ReLU(inplace=True),
@@ -24,6 +30,7 @@ class SchmidtSDA(nn.Module):
             nn.ReLU(inplace=True),
             nn.MaxPool2d(kernel_size=2, stride=2, return_indices=True),  # useful when unpooling
         )
+        # fc part of encoder
         self.encoder_comp = nn.Sequential(
             nn.Linear(in_features=self.linear_in, out_features=4096),
             nn.ReLU(inplace=True),
@@ -45,6 +52,7 @@ class SchmidtSDA(nn.Module):
             nn.ReLU(inplace=True),
         )
         self.unpool = nn.MaxUnpool2d(kernel_size=3, stride=2)
+        # fc part of decoder
         self.decoder_conv = nn.Sequential(
             nn.ReLU(inplace=True),
             nn.ConvTranspose2d(in_channels=16, out_channels=16, kernel_size=3, padding=1),
@@ -67,9 +75,13 @@ class SchmidtSDA(nn.Module):
         z = self.encoder_comp(x.view(-1, self.linear_in))
         x = self.decoder_comp(z)
         # specify output size when unpooling
-        x = self.unpool(x.view(-1, 16, self.after_pool, self.after_pool),
-                        pool_indices,
-                        output_size=(-1, 16, self.before_pool, self.before_pool))
+        x = self.unpool(
+            x.view(-1,
+                   self.after_pool_channels,
+                   self.after_pool_width,
+                   self.after_pool_height),
+            pool_indices,
+            output_size=(-1, self.after_pool_channels, self.before_pool, self.before_pool))
         return self.decoder_conv(x), z
 
     @staticmethod

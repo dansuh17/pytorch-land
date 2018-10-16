@@ -5,16 +5,18 @@ import torch.nn as nn
 import torch.optim as optim
 import torchvision
 from datasets.noisy_mnist import load_noisy_mnist_dataloader
+from datasets.loader_maker import DataLoaderMaker
 from .schmidt_sda import SchmidtSDA
 from base_trainer import NetworkTrainer
 from tensorboardX import SummaryWriter
 
 
 class SchimdtSDATrainer(NetworkTrainer):
-    def __init__(self, config: dict):
+    def __init__(self, config: dict, loadermaker_cls: DataLoaderMaker.__class__):
         super().__init__()
         self.input_root_dir = config['input_root_dir']
         self.output_root_dir = config['output_root_dir']
+        self.input_data_dir = os.path.join(self.input_root_dir, config['data_dir'])
         self.log_dir = os.path.join(self.output_root_dir, config['log_dir'])
         self.model_dir = os.path.join(self.output_root_dir, config['model_dir'])
 
@@ -22,6 +24,8 @@ class SchimdtSDATrainer(NetworkTrainer):
         os.makedirs(self.log_dir, exist_ok=True)
         os.makedirs(self.model_dir, exist_ok=True)
 
+        self.input_width = config['input_width']
+        self.input_height = config['input_height']
         self.batch_size = config['batch_size']
         self.lr_init = config['lr_init']
         self.total_epoch = config['epoch']
@@ -29,12 +33,20 @@ class SchimdtSDATrainer(NetworkTrainer):
         self.writer = SummaryWriter(log_dir=self.log_dir)
         print('Summary Writer Created')
 
+        # create dataloaders
+        loadermaker = loadermaker_cls(self.input_data_dir, self.batch_size)
+        self.train_dataloader = loadermaker.make_train_dataloader()
+        self.val_dataloader = loadermaker.make_validate_dataloader()
+        self.test_dataloader = loadermaker.make_test_dataloader()
+
         self.train_dataloader, self.val_dataloader, self.test_dataloader = \
             load_noisy_mnist_dataloader(self.batch_size)
-        self.input_dim = 28  # mnist
         print('Dataloaders created')
 
-        self.dae = SchmidtSDA(input_channel=1, input_dim=self.input_dim).to(self.device)
+        self.dae = SchmidtSDA(
+            input_channel=1,
+            input_width=self.input_width,
+            input_height=self.input_height).to(self.device)
         self.dae = torch.nn.parallel.DataParallel(self.dae, device_ids=self.device_ids)
         print('Model created')
         print(self.dae)
@@ -62,7 +74,9 @@ class SchimdtSDATrainer(NetworkTrainer):
             train_loss = self.run_epoch(self.test_dataloader, train=True)
             if best_loss > train_loss:
                 best_loss = train_loss
-                dummy_input = torch.randn((4, 1, self.input_dim, self.input_dim)).to(self.device)
+                dummy_input = torch.randn(
+                    (4, 1, self.input_width, self.input_height)
+                ).to(self.device)
                 onnx_path = os.path.join(self.model_dir, 'schmidt_sda.onnx')
                 # TODO: no symbol for max_pool2d_with_indices
                 # self.save_module(self.dae.module, onnx_path, save_onnx=True, dummy_input=dummy_input)
@@ -90,10 +104,12 @@ class SchimdtSDATrainer(NetworkTrainer):
                 if self.step % 20 == 0:
                     loss_val = loss.item()
                     losses.append(loss_val)
-                    self.log_performance(self.writer, {'loss': loss_val}, self.epoch, self.step)
+                    self.log_performance(
+                        self.writer, {'loss': loss_val}, self.epoch, self.step)
 
                 if self.step % 500 == 0:  # save models
-                    model_path = os.path.join(self.model_dir, 'schmidt_dae_e{}.pth'.format(self.epoch))
+                    model_path = os.path.join(
+                        self.model_dir, 'schmidt_dae_e{}.pth'.format(self.epoch))
                     self.save_module(self.dae.module, model_path)
                     self.save_module_summary(self.writer, self.dae.module, self.step)
 

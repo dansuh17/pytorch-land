@@ -28,6 +28,7 @@ import numpy as np
 from torch.utils.data import Dataset, DataLoader, sampler
 from tqdm import tqdm
 from utils.spectrogram import split_spectrogram
+from .loader_maker import DataLoaderMaker
 
 
 N_MELS = 40  # number of mel filters
@@ -43,6 +44,63 @@ CLEAN_TRAINSET_DIR = 'clean_trainset'
 NOISY_TRAINSET_DIR = 'noisy_trainset'
 
 
+class VCTKLoaderMaker(DataLoaderMaker):
+    """Class that helps creating DataLoader instances for VCTK dataset."""
+    def __init__(self, data_path: str, batch_size: int, num_workers=4):
+        super().__init__()
+        self.batch_size = batch_size
+        self.num_workers = num_workers
+
+        # create datasets
+        self.train_dataset = NoisyVCTKSpectrogram(data_path)
+        self.validate_dataset = NoisyVCTKSpectrogram(data_path)
+        self.test_dataset = NoisyVCTKSpectrogram(data_path)
+
+        # calculate indices out of dataset size
+        num_data = len(self.train_dataset)
+        indices = list(range(num_data))
+        random.shuffle(indices)
+        num_train = math.floor(num_data * 0.8)
+        num_valtest = num_data - num_train
+        num_validate = num_valtest // 2
+
+        self.train_idx, valtest_idx = \
+            indices[:num_train], indices[num_train:]
+        self.validate_idx, self.test_idx = \
+            valtest_idx[:num_validate], valtest_idx[num_validate:]
+
+    def make_train_dataloader(self):
+        train_dataloader = DataLoader(
+            self.train_dataset,
+            sampler=sampler.SubsetRandomSampler(self.train_idx),
+            pin_memory=True,
+            drop_last=True,
+            num_workers=self.num_workers,
+            batch_size=self.batch_size)
+        return train_dataloader
+
+    def make_validate_dataloader(self):
+        validate_dataloader = DataLoader(
+            self.validate_dataset,
+            sampler=sampler.SubsetRandomSampler(self.validate_idx),
+            pin_memory=True,
+            drop_last=True,
+            num_workers=self.num_workers,
+            batch_size=self.batch_size)
+        return validate_dataloader
+
+    def make_test_dataloader(self):
+        test_dataloader = DataLoader(
+            self.test_dataset,
+            sampler=sampler.SubsetRandomSampler(self.test_idx),
+            pin_memory=True,
+            drop_last=True,
+            num_workers=4,
+            batch_size=self.batch_size)
+        return test_dataloader
+
+
+# deprecated
 def load_vctk_dataloaders(data_path: str, batch_size: int):
     """
     Load VCTK dataset (in whatever form) dataloaders.

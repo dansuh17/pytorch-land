@@ -12,8 +12,82 @@ import random
 from torch.utils import data
 import torchvision.datasets as datasets
 import torchvision.transforms as transforms
+from .loader_maker import DataLoaderMaker
 
 
+class MNISTLoaderMaker(DataLoaderMaker):
+    def __init__(self, data_root: str, batch_size: int, num_workers=4):
+        super().__init__()
+        self.batch_size = batch_size
+        self.num_classes = 10
+        self.num_workers = num_workers
+
+        train_img_dir = os.path.join(data_root, 'mnist')
+
+        # image transform (normalization)
+        mnist_transform = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize((0.1307, ), (0.3081, )),
+        ])
+
+        # create datasets
+        self.train_dataset = datasets.MNIST(
+            root=train_img_dir,
+            train=True, download=True,
+            transform=mnist_transform)
+        self.validate_dataset = datasets.MNIST(
+            root=train_img_dir,
+            train=True, download=True,
+            transform=mnist_transform)
+        # create test dataset
+        self.test_dataset = datasets.CIFAR10(
+            root=train_img_dir,
+            train=False, download=True,
+            transform=mnist_transform)
+
+        # split indices btwn. train and validation sets
+        num_data = len(self.train_dataset)
+        indices = list(range(num_data))
+        random.shuffle(indices)
+        num_train = math.floor(num_data * 0.9)
+        self.train_idx, self.validate_idx = \
+            indices[:num_train], indices[num_train:]
+
+    def make_train_dataloader(self):
+        train_dataloader = data.DataLoader(
+            self.train_dataset,
+            sampler=data.sampler.SubsetRandomSampler(self.train_idx),
+            pin_memory=True,
+            drop_last=True,
+            num_workers=self.num_workers,
+            batch_size=self.batch_size,
+        )
+        return train_dataloader
+
+    def make_validate_dataloader(self):
+        validate_dataloader = data.DataLoader(
+            self.validate_dataset,
+            sampler=data.sampler.SubsetRandomSampler(self.validate_idx),
+            pin_memory=True,
+            drop_last=True,
+            num_workers=self.num_workers,
+            batch_size=self.batch_size,
+        )
+        return validate_dataloader
+
+    def make_test_dataloader(self):
+        test_dataloader = data.DataLoader(
+            self.test_dataset,
+            pin_memory=True,
+            drop_last=True,
+            num_workers=self.num_workers,
+            shuffle=True,
+            batch_size=self.batch_size,
+        )
+        return test_dataloader
+
+
+# deprecated function
 def load_mnist(data_root: str, batch_size: int):
     """Creates loaders for MNIST dataset."""
     train_img_dir = os.path.join(data_root, 'mnist')
