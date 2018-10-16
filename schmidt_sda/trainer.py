@@ -129,13 +129,6 @@ class SchimdtSDATrainer(NetworkTrainer):
                         noisy_img, nrow, self.input_height, self.input_width, name='noisy')
                     self.add_image(
                         output, nrow, self.input_height, self.input_width, name='output')
-                # print 4 images in a row
-                grid_input = torchvision.utils.make_grid(noisy_img[:4, :], nrow=4, normalize=True)
-                grid_output = torchvision.utils.make_grid(output[:4, :], nrow=4, normalize=True)
-                self.writer.add_image(
-                    '{}/input'.format(self.epoch), grid_input, self.step)
-                self.writer.add_image(
-                    '{}/output'.format(self.epoch), grid_output, self.step)
 
         avg_loss = sum(losses) / len(losses)
         return avg_loss
