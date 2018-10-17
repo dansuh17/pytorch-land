@@ -21,6 +21,39 @@ def split_spectrogram(spec, chunk_size_in_frames: int):
     return np.hsplit(spec, num_chunks)
 
 
+def denormalize_db_spectrogram(spec, top_db=80.0, mean_db=50.0):
+    """
+    Denormalizes normalized spectrum into db-spectrum.
+
+    Args:
+        spec: normalized spectrum
+        top_db (float): maximum db level
+        mean_db (float): mean db level
+
+    Returns:
+        denormalized db spectrum
+    """
+    return spec * top_db + mean_db
+
+
+def normalize_db_spectrogram(db_spec, top_db=80.0):
+    """
+    Normalizes db spectrum with zero mean and unit variance.
+    In normal cases, librosa generates db spectrum having 80dB as maximum.
+    Thus, specifying the `top_db` will normalize assuming the
+    spectrum lies within such range.
+
+    Args:
+        db_spec: db spectrum
+        top_db (float): maximum decibel range
+
+    Returns:
+        normalized db spectrum
+    """
+    mean = np.mean(db_spec)
+    return (db_spec - mean) / top_db
+
+
 def recover_spectrogram(power_spec, original_phase):
     """
     Recover spectrogram from power spectrogram.

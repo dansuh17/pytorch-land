@@ -27,7 +27,7 @@ import librosa
 import numpy as np
 from torch.utils.data import Dataset, DataLoader, sampler
 from tqdm import tqdm
-from utils.spectrogram import split_spectrogram
+from utils.spectrogram import split_spectrogram, normalize_db_spectrogram
 from .loader_maker import DataLoaderMaker
 
 
@@ -287,9 +287,18 @@ class NoisyVCTKSpectrogram(Dataset):
         pair = np.load(self.data[idx])
         # add a channel dimension at the first (index 0) dimension
         if self.use_channel:
-            return pair[0][np.newaxis, :], pair[1][np.newaxis, :]
-        # return clean, noisy pair
-        return pair[0], pair[1]
+            # make db spectrum
+            clean_db = librosa.power_to_db(pair[0][np.newaxis, :])
+            noisy_db = librosa.power_to_db(pair[1][np.newaxis, :])
+            # normalize them
+            clean = normalize_db_spectrogram(clean_db)
+            noisy = normalize_db_spectrogram(noisy_db)
+        else:
+            clean_db = librosa.power_to_db(pair[0])
+            noisy_db = librosa.power_to_db(pair[1])
+            clean = normalize_db_spectrogram(clean_db)
+            noisy = normalize_db_spectrogram(noisy_db)
+        return clean, noisy
 
     def __len__(self):
         return len(self.data)

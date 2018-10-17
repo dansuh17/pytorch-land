@@ -74,6 +74,7 @@ class NetworkTrainer:
 
     @staticmethod
     def save_module_summary(writer, module: nn.Module, step: int, save_histogram=False, verbose=False):
+        # warning: saving histograms is expensive - both time and space
         with torch.no_grad():
             for name, parameter in module.named_parameters():
                 if parameter.grad is not None:
@@ -82,15 +83,16 @@ class NetworkTrainer:
                         print('\tavg_grad for {} = {:.6f}'.format(name, avg_grad))
                     writer.add_scalar(
                         'avg_grad/{}'.format(name), avg_grad.item(), step)
-                    writer.add_histogram(
-                        'grad/{}'.format(name), parameter.grad.cpu().numpy(), step)
+                    if save_histogram:
+                        writer.add_histogram(
+                            'grad/{}'.format(name), parameter.grad.cpu().numpy(), step)
 
-                # warning: saving histogram is expensive - both time and space
-                if save_histogram and parameter.data is not None:
+                if parameter.data is not None:
                     avg_weight = torch.mean(parameter.data)
                     if verbose:
                         print('\tavg_weight for {} = {:.6f}'.format(name, avg_weight))
                     writer.add_scalar(
                         'avg_weight/{}'.format(name), avg_weight.item(), step)
-                    writer.add_histogram(
-                        'weight/{}'.format(name), parameter.data.cpu().numpy(), step)
+                    if save_histogram:
+                        writer.add_histogram(
+                            'weight/{}'.format(name), parameter.data.cpu().numpy(), step)
