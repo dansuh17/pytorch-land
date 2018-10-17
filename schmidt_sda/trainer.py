@@ -7,6 +7,7 @@ import torch.nn as nn
 import torch.optim as optim
 import torchvision
 from datasets.loader_maker import DataLoaderMaker
+from utils.spectrogram import denormalize_db_spectrogram
 from .schmidt_sda import SchmidtSDA
 from base_trainer import NetworkTrainer
 from tensorboardX import SummaryWriter
@@ -151,7 +152,7 @@ class SchimdtSDATrainer(NetworkTrainer):
     @staticmethod
     def make_grid_from_mel(imgs, sr=16000, n_fft=256, n_mels=40):  # TODO: acquire these from constants
         """
-        Make image grid from a number of mel-spectrograms.
+        Make image grid from a number of normalized db-scale mel-spectrograms.
 
         Args:
             imgs (torch.FloatTensor): tensor of images
@@ -168,9 +169,11 @@ class SchimdtSDATrainer(NetworkTrainer):
         # convert torch Tensor to numpy.ndarray
         imgs = imgs.cpu().detach().numpy()
         out_imgs = []
-        for mel_spec in imgs:
-            # convert the power spectrum to db for better visualization
+        for norm_db_mel_spec in imgs:
+            # denormalize + convert to power spectrogram
+            mel_spec = librosa.db_to_power(denormalize_db_spectrogram(norm_db_mel_spec))
             spec = np.dot(mel_basis_inv, mel_spec)
+            # convert the power spectrum to db for better visualization
             img = librosa.power_to_db(spec, ref=np.max)
             height, width = img.shape
             out_imgs.append(torch.from_numpy(img).float().view(-1, height, width))
