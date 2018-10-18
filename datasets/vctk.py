@@ -318,13 +318,17 @@ def preprocess():
         in_path=dataset_path,
         out_path=out_path,
         noisy_dir=NOISY_TRAINSET_DIR,
-        clean_dir=CLEAN_TRAINSET_DIR)
+        clean_dir=CLEAN_TRAINSET_DIR,
+        split_size=40,
+    )
     # preprocess test set
     noisy_vctk_preprocess(
         in_path=dataset_path,
         out_path=out_path,
         noisy_dir=NOISY_TESTSET_WAV,
-        clean_dir=CLEAN_TESTSET_WAV)
+        clean_dir=CLEAN_TESTSET_WAV,
+        split_size=40,
+    )
 
     ### UNCOMMENT BELOW TO PROCESS ORIGINAL SPECTROGRAMS FOR TRAINING SET
     # create spectrogram data also - used for waveform recovery
@@ -340,7 +344,9 @@ def preprocess():
         out_path=out_path,
         noisy_dir=NOISY_TESTSET_WAV,
         clean_dir=CLEAN_TESTSET_WAV,
-        mel=False)
+        split_size=40,
+        mel=False,
+    )
 
 
 if __name__ == '__main__':
