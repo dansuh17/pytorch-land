@@ -266,14 +266,16 @@ class NoisyVCTKSpectrogram(Dataset):
     Dataset for VCTK dataset that has been preprocessed into mel-spectrogram chunks.
     The dataset returns pairs of clean and noisy mel-spectrograms.
     """
-    def __init__(self, data_path: str, use_channel=False):
+    def __init__(self, data_path: str, use_channel=False, use_db_spec=False):
         """
         Args:
             data_path (str): data path
             use_channel (bool): add a channel dimension if True
+            use_db_spec (bool): if True, data is given as db-scaled spectrogram (normalized)
         """
         super().__init__()
         self.use_channel = use_channel
+        self.use_db_spec = use_db_spec
 
         data = []
         for speaker_id in os.listdir(data_path):
@@ -285,19 +287,18 @@ class NoisyVCTKSpectrogram(Dataset):
 
     def __getitem__(self, idx):
         pair = np.load(self.data[idx])
-        # add a channel dimension at the first (index 0) dimension
         if self.use_channel:
-            # make db spectrum
-            clean_db = librosa.power_to_db(pair[0][np.newaxis, :])
-            noisy_db = librosa.power_to_db(pair[1][np.newaxis, :])
-            # normalize them
-            clean = normalize_db_spectrogram(clean_db)
-            noisy = normalize_db_spectrogram(noisy_db)
+            # add a channel dimension at the first (index 0) dimension
+            clean = pair[0][np.newaxis, :]
+            noisy = pair[1][np.newaxis, :]
         else:
-            clean_db = librosa.power_to_db(pair[0])
-            noisy_db = librosa.power_to_db(pair[1])
-            clean = normalize_db_spectrogram(clean_db)
-            noisy = normalize_db_spectrogram(noisy_db)
+            clean = pair[0]
+            noisy = pair[1]
+
+        # use db-scaled spectrum
+        if self.use_db_spec:
+            clean = normalize_db_spectrogram(librosa.power_to_db(clean))
+            noisy = normalize_db_spectrogram(librosa.power_to_db(noisy))
         return clean, noisy
 
     def __len__(self):
