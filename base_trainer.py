@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from datasets.loader_maker import DataLoaderMaker
 
 
 class NetworkTrainer:
@@ -22,19 +23,32 @@ class NetworkTrainer:
     """
     def __init__(self,
                  model,
-                 dataloader_maker,
-                 update_func: function,
+                 dataloader_maker: DataLoaderMaker,
+                 update_func,
                  criterion,
                  optimizer,
-                 config: dict,
+                 epoch: int,
+                 writer,
+                 output_dir='data_out',
+                 num_devices=1,
+                 seed=None,
                  lr_scheduler=None):
-        self.model = model
-        self.dataloader_maker = dataloader_maker
+        # initial settings
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        if seed is None:
+            self.seed = torch.initial_seed()
+        print('Using random seed : {}'.format(self.seed))
+
+        # set model
+        self.model = model.to(self.device)
+        #
+        self.train_dataloader = dataloader_maker.make_train_dataloader()
+        self.val_dataloader = dataloader_maker.make_validate_dataloader()
+        self.test_dataloader = dataloader_maker.make_test_dataloader()
         self.update = update_func
         self.criterion = criterion
         self.optimizer = optimizer
         self.lr_scheduler = lr_scheduler
-
 
 
 #### DEPRECATED ####
