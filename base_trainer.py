@@ -20,17 +20,29 @@ class NetworkTrainer:
     train(model(s), dataloader_maker, update_function, criterion(s), optimizer(s), lr_scheduler(s), **kwargs_for_trainer)
 
     """
-    def __init__(self):
-        pass
+    def __init__(self,
+                 model,
+                 dataloader_maker,
+                 update_func: function,
+                 criterion,
+                 optimizer,
+                 config: dict,
+                 lr_scheduler=None):
+        self.model = model
+        self.dataloader_maker = dataloader_maker
+        self.update = update_func
+        self.criterion = criterion
+        self.optimizer = optimizer
+        self.lr_scheduler = lr_scheduler
 
 
+
+#### DEPRECATED ####
 class NetworkTrainerOld:
     """Base trainer for neural net training.
 
     This provides a minimal set of methods that any trainer
     should implement.
-
-    #### DEPRECATED ####
     """
 
     def __init__(self):
