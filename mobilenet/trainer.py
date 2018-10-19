@@ -6,10 +6,10 @@ import math
 from .mobilenet import MobileNet
 from datasets.img_popular import load_imagenet
 from tensorboardX import SummaryWriter
-from base_trainer import NetworkTrainer
+from base_trainer import NetworkTrainerOld
 
 
-class MobileNetTrainer(NetworkTrainer):
+class MobileNetTrainerOld(NetworkTrainerOld):
     def __init__(self, config):
         super().__init__()
         self.input_root_dir = config['input_root_dir']
@@ -167,6 +167,6 @@ if __name__ == '__main__':
     with open(os.path.join(dirpath, 'config.json'), 'r') as configf:
         config = json.loads(configf.read())
 
-    trainer = MobileNetTrainer(config)
+    trainer = MobileNetTrainerOld(config)
     trainer.train()
     trainer.cleanup()

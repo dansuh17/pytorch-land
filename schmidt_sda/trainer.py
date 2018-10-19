@@ -9,11 +9,11 @@ import torchvision
 from datasets.loader_maker import DataLoaderMaker
 from utils.spectrogram import denormalize_db_spectrogram
 from .schmidt_sda import SchmidtSDA
-from base_trainer import NetworkTrainer
+from base_trainer import NetworkTrainerOld
 from tensorboardX import SummaryWriter
 
 
-class SchimdtSDATrainer(NetworkTrainer):
+class SchimdtSDATrainerOld(NetworkTrainerOld):
     def __init__(self, config: dict, loadermaker_cls: DataLoaderMaker.__class__):
         super().__init__()
         self.input_root_dir = config['input_root_dir']
@@ -201,6 +201,6 @@ if __name__ == '__main__':
     with open(os.path.join(dirpath, 'config_vctk.json'), 'r') as configf:
         config = json.loads(configf.read())
 
-    trainer = SchimdtSDATrainer(config, VCTKLoaderMaker)
+    trainer = SchimdtSDATrainerOld(config, VCTKLoaderMaker)
     trainer.train()
     trainer.cleanup()

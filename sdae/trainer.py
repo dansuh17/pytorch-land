@@ -6,13 +6,13 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torchvision.utils
-from base_trainer import NetworkTrainer
+from base_trainer import NetworkTrainerOld
 from .sdae import GeneralizedSDAE
 from datasets.vctk import load_vctk_dataloaders
 from tensorboardX import SummaryWriter
 
 
-class SDAETrainer(NetworkTrainer):
+class SDAETrainerOld(NetworkTrainerOld):
     """Trainer for Stacked Denoising Auto-Encoder"""
     def __init__(self):
         super().__init__()
@@ -255,6 +255,6 @@ class SDAETrainer(NetworkTrainer):
 
 if __name__ == '__main__':
     # completely train mnist to stacked denoising autoencoder and cleanup afterwards
-    trainer = SDAETrainer()
+    trainer = SDAETrainerOld()
     trainer.train()
     trainer.cleanup()

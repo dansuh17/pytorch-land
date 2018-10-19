@@ -3,10 +3,34 @@ import torch.nn as nn
 
 
 class NetworkTrainer:
+    """
+    # TODO: REFACTOR
+    1. define update step
+    2. define input (perhaps in NamedTuple?)
+    3. define output (perhaps in NamedTuple?)
+    4. define performance metric
+    5. define required hyperparameters
+
+    input imposed -> dataloaders, trainer
+    output imposed -> trainer, model
+    update step -> trainer
+    performance metric -> output
+    hyperparameters -> trainer, dataloaders (like batch sizes)
+
+    train(model(s), dataloader_maker, update_function, criterion(s), optimizer(s), lr_scheduler(s), **kwargs_for_trainer)
+
+    """
+    def __init__(self):
+        pass
+
+
+class NetworkTrainerOld:
     """Base trainer for neural net training.
 
     This provides a minimal set of methods that any trainer
     should implement.
+
+    #### DEPRECATED ####
     """
 
     def __init__(self):

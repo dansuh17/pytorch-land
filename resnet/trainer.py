@@ -4,11 +4,11 @@ import math
 import torch
 from torch import optim, nn
 from datasets.img_popular import load_imagenet
-from base_trainer import NetworkTrainer
+from base_trainer import NetworkTrainerOld
 from tensorboardX import SummaryWriter
 
 
-class ResnetTrainer(NetworkTrainer):
+class ResnetTrainerOld(NetworkTrainerOld):
     """Trainer for ResNet on imagenet 2012 dataset."""
     def __init__(self, config):
         super().__init__()
@@ -206,6 +206,6 @@ if __name__ == '__main__':
     with open(os.path.join(dirpath, 'config.json'), 'r') as configf:
         config = json.loads(configf.read())
 
-    trainer = ResnetTrainer(config)
+    trainer = ResnetTrainerOld(config)
     trainer.train()
     trainer.cleanup()
