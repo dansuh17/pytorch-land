@@ -73,7 +73,7 @@ class SchimdtSDATrainerOld(NetworkTrainerOld):
             self.writer.add_scalar('epoch', self.epoch, self.step)
 
             # train - model update
-            train_loss = self.run_epoch(self.test_dataloader, train=True)
+            train_loss = self.run_epoch(self.train_dataloader, train=True)
             if best_loss > train_loss:
                 best_loss = train_loss
                 dummy_input = torch.randn(

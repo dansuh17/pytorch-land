@@ -313,6 +313,7 @@ def preprocess():
     unpack_dataset('DS_10283_2791.zip', out_path=dataset_path)
 
     out_path = 'vctk_processed'
+    out_path_test = 'vctk_testset'
     # preprocess train set
     noisy_vctk_preprocess(
         in_path=dataset_path,
@@ -341,7 +342,7 @@ def preprocess():
     #     mel=False)
     noisy_vctk_preprocess(
         in_path=dataset_path,
-        out_path=out_path,
+        out_path=out_path_test,
         noisy_dir=NOISY_TESTSET_WAV,
         clean_dir=CLEAN_TESTSET_WAV,
         split_size=40,
