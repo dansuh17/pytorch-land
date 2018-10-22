@@ -9,8 +9,44 @@ import torchvision
 from datasets.loader_maker import DataLoaderMaker
 from utils.spectrogram import denormalize_db_spectrogram
 from .schmidt_sda import SchmidtSDA
-from base_trainer import NetworkTrainerOld
+from base_trainer import NetworkTrainerOld, NetworkTrainer
 from tensorboardX import SummaryWriter
+
+
+class SchmidtSDATrainer(NetworkTrainer):
+    def __init__(self):
+        batch_size = 256
+        input_data_dir = 'schmidt_sda_data_in/vctk_processed'
+        model = SchmidtSDA(
+            input_channel=1,
+            input_height=40,
+            input_width=40,
+        )
+        dataloader_maker = VCTKLoaderMaker(input_data_dir, batch_size, use_channel=True)
+        criterion = nn.MSELoss(size_average=True)
+        optimizer = optim.Adam(params=model.parameters(),
+                               lr=0.001)
+        lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+            optimizer, mode='min', verbose=True, factor=0.2, patience=7)
+        super().__init__(model, dataloader_maker, criterion, optimizer, epoch=500,
+                         input_size=(40, 40), num_devices=4, lr_scheduler=lr_scheduler)
+
+    @staticmethod
+    def input_transform(data):
+        clean_img = data[0].float()
+        noisy_img = data[1].float()
+        return clean_img, noisy_img
+
+    def forward(self, model, input, *args, **kwargs):
+        return model(input[1])  # feed noisy image to the model
+
+    def criterion_input_maker(self, input, output):
+        output_img, _ = output  # latent vector not used
+        clean_img, _ = input
+        return output_img, clean_img
+
+    def save_checkpoint(self, filename: str):
+        pass
 
 
 class SchimdtSDATrainerOld(NetworkTrainerOld):
@@ -201,6 +237,9 @@ if __name__ == '__main__':
     with open(os.path.join(dirpath, 'config_vctk.json'), 'r') as configf:
         config = json.loads(configf.read())
 
-    trainer = SchimdtSDATrainerOld(config, VCTKLoaderMaker)
-    trainer.train()
+    # trainer = SchimdtSDATrainerOld(config, VCTKLoaderMaker)
+    # trainer.train()
+    # trainer.cleanup()
+    trainer = SchmidtSDATrainer()
+    trainer.fit()
     trainer.cleanup()

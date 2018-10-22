@@ -1,10 +1,12 @@
 import os
+from abc import ABC, abstractmethod
 import operator
 from enum import Enum, unique
 from collections import defaultdict
 import torch
 import torch.nn as nn
 from datasets.loader_maker import DataLoaderMaker
+from tensorboardX import SummaryWriter
 
 
 @unique
@@ -15,6 +17,7 @@ class TrainStage(Enum):
 
 
 class MetricManager:
+    """Class for managing mutiple metrics."""
     def __init__(self):
         self.metric_tracker = defaultdict(list)
 
@@ -30,22 +33,12 @@ class MetricManager:
         return {key: self.mean(key) for key in self.metric_tracker.keys()}
 
 
-class NetworkTrainer:
+class NetworkTrainer(ABC):
     """
-    # TODO: REFACTOR
-    1. define update step
-    2. define input (perhaps in NamedTuple?)
-    3. define output (perhaps in NamedTuple?)
-    4. define performance metric
-    5. define required hyperparameters
-
-    input imposed -> dataloaders, trainer
-    output imposed -> trainer, model
-    update step -> trainer
-    performance metric -> output
-    hyperparameters -> trainer, dataloaders (like batch sizes)
-
-    train(model(s), dataloader_maker, update_function, criterion(s), optimizer(s), lr_scheduler(s), **kwargs_for_trainer)
+    Generalized Neural Network trainer that make it easy to customize for different
+    models, dataloaders, criterions, etc.
+    It also provides basic logging, model saving, and summary writing.
+    ``fit()`` method provides a standardized training process - train-validate-test.
     """
 
     def __init__(self,
@@ -55,15 +48,33 @@ class NetworkTrainer:
                  optimizer,
                  epoch: int,
                  input_size,
-                 writer=None,
                  output_dir='data_out',
                  num_devices=1,
                  seed: int=None,
                  lr_scheduler=None):
+        """
+        Initialize the trainer.
+
+        Args:
+            model (nn.Module | tuple[nn.Module]): network model(s)
+            dataloader_maker (DataLoaderMaker): instance creating dataloaders
+            criterion: training criterion (a.k.a. loss function)
+            optimizer: gradient descent optimizer
+            epoch: total epochs to train (the end epoch)
+            input_size (tuple[int]|tuple[tuple[int]]): size of inputs
+                - must match the number of models provided
+            output_dir (str): root output directory
+            num_devices (int): number of GPU devices to split the batch
+            seed (int): random seed to use
+            lr_scheduler: learning rate scheduler
+        """
         # initial settings
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         if seed is None:
             self.seed = torch.initial_seed()
+        else:
+            self.seed = seed
+            torch.manual_seed(seed)
         print('Using random seed : {}'.format(self.seed))
 
         # training devices to use
@@ -94,16 +105,19 @@ class NetworkTrainer:
         self.criterion = criterion
         self.optimizer = optimizer
         self.lr_scheduler = lr_scheduler
-        self.writer = writer
+
+        self.writer = SummaryWriter(log_dir=self.log_dir)
 
         self.epoch = 0
         self.train_step = 0
 
     @property
     def standard_metric(self):
+        """Define the standard metric to compare the performance of models."""
         return 'loss'
 
     def _create_output_dir(self, dirname: str):
+        """Creates a directory in the root output directory."""
         path = os.path.join(self.output_dir, dirname)
         os.makedirs(path, exist_ok=True)
         return path
@@ -127,6 +141,7 @@ class NetworkTrainer:
             self.writer.add_scalar('epoch', self.epoch, self.train_step)
 
             train_metrics = self.train()
+            # compare the train metric and save the best model - TODO: should I use the validation metric?
             best_metric = self.save_best_model(best_metric, train_metrics)
 
             # run upon validation set
@@ -137,12 +152,14 @@ class NetworkTrainer:
                 self.lr_scheduler.step(val_metrics.mean(self.standard_metric))
         # run upon test set
         test_metrics = self.test()
+        print('Training complete.')
 
     def run_epoch(self, dataloader, train_stage=TrainStage.TRAIN):
         metric_manager = MetricManager()
         dataloader_size = len(dataloader)
         for step, data in enumerate(dataloader):
-            output = self.forward(self.model, data)
+            data = self.input_transform(data).to(self.device)  # transform dataloader's data
+            output = self.forward(self.model, data)  # feed the data to model
             loss = self.calc_loss(self.criterion, self.criterion_input_maker, data, output)
 
             # metric calculation
@@ -175,12 +192,11 @@ class NetworkTrainer:
         return torch.nn.parallel.DataParallel(
             model.to(self.device), device_ids=self.device_ids)
 
-    @staticmethod
     def criterion_input_maker(self, input, output) -> tuple:
-        raise NotImplementedError
+        return output, input
 
-    @staticmethod
-    def forward(model, input, *args, **kwargs):
+    @abstractmethod
+    def forward(self, model, input, *args, **kwargs):
         """
         Method for model inference.
 
@@ -227,13 +243,13 @@ class NetworkTrainer:
         pass
 
     def on_epoch_finish(self, metric_manager: MetricManager, train_stage: TrainStage):
-        if train_stage == TrainStage.VALIDATE:
+        if train_stage == TrainStage.VALIDATE or train_stage == TrainStage.TEST:
             self.log_metric(
                 self.writer,
                 metric_manager.mean_dict(),
                 self.epoch,
                 self.train_step,
-                summary_group='validate')
+                summary_group=train_stage.value)
 
     def save_checkpoint(self, filename: str):
         """Saves the model and training checkpoint.
@@ -244,7 +260,14 @@ class NetworkTrainer:
         raise NotImplementedError
 
     def cleanup(self):
-        raise NotImplementedError
+        self.writer.close()
+
+    @staticmethod
+    def input_transform(data):
+        """Provide an adapter between dataloader outputs and model inputs.
+        It is an id() function by default.
+        """
+        return data
 
     def _save_module(self, save_onnx=False, prefix=''):
         if isinstance(self.model, tuple):
@@ -260,7 +283,7 @@ class NetworkTrainer:
                 # TODO: input / output names?
                 # warning: cannot export DataParallel-wrapped module
                 path = os.path.join(self.onnx_dir, '{}{}_onnx.pth'.format(prefix, model.__class__.__name__))
-                dummy_input = torch.randn(input_sizes[model_idx])
+                dummy_input = torch.randn((1, ) + input_sizes[model_idx])
                 torch.onnx.export(model, dummy_input, path, verbose=True)
                 # check validity of onnx IR and print the graph
                 model = onnx.load(path)
