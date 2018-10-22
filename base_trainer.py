@@ -1,8 +1,17 @@
 import os
+from enum import Enum, unique
 from collections import defaultdict
+import math
 import torch
 import torch.nn as nn
 from datasets.loader_maker import DataLoaderMaker
+
+
+@unique
+class TrainStage(Enum):
+    TRAIN = 'train'
+    VALIDATE = 'validate'
+    TEST = 'test'
 
 
 class MetricManager:
@@ -15,7 +24,10 @@ class MetricManager:
 
     def mean(self, key: str):
         metric_list = self.metric_tracker[key]
-        sum(metric_list) / len(metric_list)
+        return sum(metric_list) / len(metric_list)
+
+    def mean_dict(self):
+        return {key: self.mean(key) for key in self.metric_tracker.keys()}
 
 
 class NetworkTrainer:
@@ -39,14 +51,12 @@ class NetworkTrainer:
     def __init__(self,
                  model,
                  dataloader_maker: DataLoaderMaker,
-                 forward_func,
                  criterion,
                  optimizer,
                  epoch: int,
                  writer=None,
                  output_dir='data_out',
                  num_devices=1,
-                 input_transform=lambda x: x,  # identity function as default
                  seed: int=None,
                  lr_scheduler=None):
         # initial settings
@@ -59,11 +69,19 @@ class NetworkTrainer:
         self.device_ids = list(range(num_devices))
 
         # prepare model(s) for training
-        self.model_name: str = model.__class__.__name__
         if isinstance(model, tuple):  # in case of having multiple models
+            self.model_name = '_'.join(map(lambda x: x.__class__.__name__, model))
             self.model = tuple(map(self.register_model, model))
         else:
+            self.model_name = model.__class__.__name__
             self.model = self.register_model(model)
+
+        # setup and create output directories
+        self.output_dir = output_dir
+        self.log_dir = self.create_output_dir('logs')
+        self.model_dir = self.create_output_dir('models')
+        self.onnx_dir = self.create_output_dir('onnx')
+        self.checkpoint_dir = self.create_output_dir('checkpoints')
 
         # create dataloaders
         self.train_dataloader = dataloader_maker.make_train_dataloader()
@@ -71,106 +89,144 @@ class NetworkTrainer:
         self.test_dataloader = dataloader_maker.make_test_dataloader()
 
         self.total_epoch = epoch
-        self.forward = forward_func
         self.criterion = criterion
         self.optimizer = optimizer
         self.lr_scheduler = lr_scheduler
         self.writer = writer
 
-        # TODO: maintain a trainer state?
         self.epoch = 0
         self.train_step = 0
 
-    def register_model(self, model):
-        return torch.nn.parallel.DataParallel(
-            model.to(self.device), device_ids=self.device_ids)
+    def create_output_dir(self, dirname: str):
+        path = os.path.join(self.output_dir, dirname)
+        os.makedirs(path, exist_ok=True)
+        return path
 
-    def criterion_maker(self, input, output):
-        raise NotImplementedError  # must be provided through __init__()
-
-    def forward(self, model, input):
-        raise NotImplementedError  # must be provided through __init__()
-
-    @staticmethod
-    def update(optimizer, loss):
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-
-    @staticmethod
-    def calc_loss(criterion, criterion_maker, input, output):
-        return criterion(*criterion_maker(input, output))
-
-    @staticmethod
-    def lr_scheduler_metric_selector(metric):
-        return metric['loss']
+    def save_best_model(self, model, prev_best_metric, curr_metric):
+        if prev_best_metric is None:
+            return curr_metric
+        if prev_best_metric.mean('loss') > curr_metric.mean('loss'):
+            self.save_module(model, self.onnx_dir, save_onnx=True, dummy_input=)
 
     def fit(self):
+        best_metric = None
         for _ in range(self.epoch, self.total_epoch):
             self.writer.add_scalar('epoch', self.epoch, self.train_step)
 
-            train_metric = self.train()
-            # TODO: find the best performance metric + save onnx
+            train_metrics = self.train()
+            best_metric = self.save_best_model(self.model.module, best_metric, train_metrics)
 
             # run upon validation set
-            val_metric = self.validate()
+            val_metrics = self.validate()
 
+            # update learning rate based on validation metric
             if self.lr_scheduler is not None:
                 self.lr_scheduler.step(
-                    self.lr_scheduler_metric_selector(val_metric))
+                    self.lr_scheduler_metric_selector(val_metrics))
         # run upon test set
-        test_metric = self.test()
+        test_metrics = self.test()
 
-    @staticmethod
-    def make_performance_metric(input, output, loss):
-        return {'loss': loss}
-
-    def post_train_step(self, input, output, metric, train_step: int):
-        if train_step % 20 == 0:
-            self.log_metric(self.writer, metric, self.epoch, self.train_step)
-
-        if train_step % 500 == 0:  # save models
-            model_path = os.path.join(
-                self.model_dir, '{}_e{}.pth'.format(self.model_name, self.epoch))
-            self.save_module(self.model.module, model_path)
-            self.save_module_summary(self.writer, self.model.module, self.train_step)
-
-    def run_epoch(self, dataloader, train=True, post_train_step=None, post_nontrain_step=None, pre_epoch_finish=None):
+    def run_epoch(self, dataloader, train_stage=TrainStage.TRAIN):
         metric_manager = MetricManager()
         dataloader_size = len(dataloader)
         for step, data in enumerate(dataloader):
-            output = self.forward(data)
-            loss = self.calc_loss(self.criterion, self.criterion_maker, data, output)
+            output = self.forward(self.model, data)
+            loss = self.calc_loss(self.criterion, self.criterion_input_maker, data, output)
 
             # metric calculation
             metric = self.make_performance_metric(data, output, loss)
             metric_manager.append_metric(metric)
 
-            if train:
+            if train_stage == TrainStage.TRAIN:
                 self.update(self.optimizer, loss)
-                if post_train_step is not None:
-                    post_train_step(data, output, metric, self.train_step)
                 self.train_step += 1
-            else:
-                if post_nontrain_step is not None:
-                    post_nontrain_step(data, output, metric, step)
 
-            if step == dataloader_size - 1 and pre_epoch_finish is not None:
-                pre_epoch_finish()
+            self.post_step(data, output, metric, train_stage=train_stage)
+
+            if step == dataloader_size - 1:
+                self.pre_epoch_finish(data, output, metric_manager, train_stage=train_stage)
+        self.on_epoch_finish(metric_manager, train_stage=train_stage)
         return metric_manager
 
     def test(self):
-        return self.run_epoch(self.test_dataloader)
+        return self.run_epoch(self.test_dataloader, TrainStage.TEST)
 
     def train(self):
         # train (model update)
-        return self.run_epoch(self.train_dataloader, train=True, post_train_step=self.post_train_step)
+        return self.run_epoch(self.train_dataloader, TrainStage.TRAIN)
 
-    def validate(self, post_epoch=None):
-        metric = self.run_epoch(self.val_dataloader)
-        if post_epoch is not None:
-            post_epoch(metric, )
-        return metric
+    def validate(self):
+        return self.run_epoch(self.val_dataloader, TrainStage.VALIDATE)
+
+    def register_model(self, model):
+        return torch.nn.parallel.DataParallel(
+            model.to(self.device), device_ids=self.device_ids)
+
+    @staticmethod
+    def criterion_input_maker(self, input, output) -> tuple:
+        raise NotImplementedError
+
+    @staticmethod
+    def forward(model, input, *args, **kwargs):
+        """
+        Default method for model inference.
+
+        Args:
+            model (nn.Module | tuple[nn.Module]): neural net model
+            input (torch.Tensor | tuple[nn.Module]): input tensor
+
+        Returns:
+            output (torch.Tensor | tuple[nn.Module]): inference result
+        """
+        return model(input)
+
+    @staticmethod
+    def update(optimizer, loss):
+        """
+        Updates the neural network using optimization algorithm and loss gradient.
+
+        Args:
+            optimizer:
+            loss:
+        """
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+    @staticmethod
+    def calc_loss(criterion, criterion_input_maker, input, output):
+        return criterion(*criterion_input_maker(input, output))
+
+    @staticmethod
+    def lr_scheduler_metric_selector(metric: MetricManager):
+        return metric.mean('loss')
+
+    @staticmethod
+    def make_performance_metric(input, output, loss) -> dict:
+        return {'loss': loss}
+
+    def post_step(self, input, output, metric: dict, train_stage: TrainStage):
+        if train_stage == TrainStage.TRAIN:
+            if self.train_step % 20 == 0:
+                self.log_metric(self.writer, metric, self.epoch, self.train_step)
+
+            if self.train_step % 500 == 0:  # save models
+                model_path = os.path.join(
+                    self.model_dir, '{}_e{}.pth'.format(self.model_name, self.epoch))
+                self.save_module(self.model.module, model_path)
+                self.save_module_summary(self.writer, self.model.module, self.train_step)
+
+    def pre_epoch_finish(self, input, output, metric_manager: MetricManager, train_stage: TrainStage):
+        pass
+
+    def on_epoch_finish(self, metric_manager: MetricManager, train_stage: TrainStage):
+        if train_stage == TrainStage.VALIDATE:
+            self.log_metric(
+                self.writer,
+                metric_manager.mean_dict(),
+                self.epoch,
+                self.train_step,
+                summary_group='validate')
 
     def save_checkpoint(self, filename: str):
         """Saves the model and training checkpoint.
