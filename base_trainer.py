@@ -291,7 +291,7 @@ class NetworkTrainer(ABC):
             models = [m.module for m in self.model]
             input_sizes = self.input_size
         else:
-            models = self.model.module
+            models = (self.model.module, )
             input_sizes = (self.input_size, )
 
         for model_idx, model in enumerate(models):
