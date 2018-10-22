@@ -1,7 +1,7 @@
 import os
+import operator
 from enum import Enum, unique
 from collections import defaultdict
-import math
 import torch
 import torch.nn as nn
 from datasets.loader_maker import DataLoaderMaker
@@ -54,6 +54,7 @@ class NetworkTrainer:
                  criterion,
                  optimizer,
                  epoch: int,
+                 input_size,
                  writer=None,
                  output_dir='data_out',
                  num_devices=1,
@@ -78,16 +79,17 @@ class NetworkTrainer:
 
         # setup and create output directories
         self.output_dir = output_dir
-        self.log_dir = self.create_output_dir('logs')
-        self.model_dir = self.create_output_dir('models')
-        self.onnx_dir = self.create_output_dir('onnx')
-        self.checkpoint_dir = self.create_output_dir('checkpoints')
+        self.log_dir = self._create_output_dir('logs')
+        self.model_dir = self._create_output_dir('models')
+        self.onnx_dir = self._create_output_dir('onnx')
+        self.checkpoint_dir = self._create_output_dir('checkpoints')
 
         # create dataloaders
         self.train_dataloader = dataloader_maker.make_train_dataloader()
         self.val_dataloader = dataloader_maker.make_validate_dataloader()
         self.test_dataloader = dataloader_maker.make_test_dataloader()
 
+        self.input_size = input_size  # must be torch.Size or tuple, or a tuple of them
         self.total_epoch = epoch
         self.criterion = criterion
         self.optimizer = optimizer
@@ -97,16 +99,27 @@ class NetworkTrainer:
         self.epoch = 0
         self.train_step = 0
 
-    def create_output_dir(self, dirname: str):
+    @property
+    def standard_metric(self):
+        return 'loss'
+
+    def _create_output_dir(self, dirname: str):
         path = os.path.join(self.output_dir, dirname)
         os.makedirs(path, exist_ok=True)
         return path
 
-    def save_best_model(self, model, prev_best_metric, curr_metric):
+    def save_best_model(self, prev_best_metric, curr_metric, comparison=operator.lt):
         if prev_best_metric is None:
             return curr_metric
-        if prev_best_metric.mean('loss') > curr_metric.mean('loss'):
-            self.save_module(model, self.onnx_dir, save_onnx=True, dummy_input=)
+        # compare the standard metric, and if the standard performance metric
+        # is better, then save the best model
+        if comparison(
+                curr_metric.mean(self.standard_metric),
+                prev_best_metric.mean(self.standard_metric)):
+            self._save_module(save_onnx=True, prefix='best_')
+            self._save_module(prefix='best')
+            return curr_metric
+        return prev_best_metric
 
     def fit(self):
         best_metric = None
@@ -114,15 +127,14 @@ class NetworkTrainer:
             self.writer.add_scalar('epoch', self.epoch, self.train_step)
 
             train_metrics = self.train()
-            best_metric = self.save_best_model(self.model.module, best_metric, train_metrics)
+            best_metric = self.save_best_model(best_metric, train_metrics)
 
             # run upon validation set
             val_metrics = self.validate()
 
             # update learning rate based on validation metric
             if self.lr_scheduler is not None:
-                self.lr_scheduler.step(
-                    self.lr_scheduler_metric_selector(val_metrics))
+                self.lr_scheduler.step(val_metrics.mean(self.standard_metric))
         # run upon test set
         test_metrics = self.test()
 
@@ -143,6 +155,7 @@ class NetworkTrainer:
 
             self.post_step(data, output, metric, train_stage=train_stage)
 
+            # run pre-epoch-finish after the final step
             if step == dataloader_size - 1:
                 self.pre_epoch_finish(data, output, metric_manager, train_stage=train_stage)
         self.on_epoch_finish(metric_manager, train_stage=train_stage)
@@ -169,7 +182,7 @@ class NetworkTrainer:
     @staticmethod
     def forward(model, input, *args, **kwargs):
         """
-        Default method for model inference.
+        Method for model inference.
 
         Args:
             model (nn.Module | tuple[nn.Module]): neural net model
@@ -178,7 +191,7 @@ class NetworkTrainer:
         Returns:
             output (torch.Tensor | tuple[nn.Module]): inference result
         """
-        return model(input)
+        raise NotImplementedError
 
     @staticmethod
     def update(optimizer, loss):
@@ -198,10 +211,6 @@ class NetworkTrainer:
         return criterion(*criterion_input_maker(input, output))
 
     @staticmethod
-    def lr_scheduler_metric_selector(metric: MetricManager):
-        return metric.mean('loss')
-
-    @staticmethod
     def make_performance_metric(input, output, loss) -> dict:
         return {'loss': loss}
 
@@ -211,9 +220,7 @@ class NetworkTrainer:
                 self.log_metric(self.writer, metric, self.epoch, self.train_step)
 
             if self.train_step % 500 == 0:  # save models
-                model_path = os.path.join(
-                    self.model_dir, '{}_e{}.pth'.format(self.model_name, self.epoch))
-                self.save_module(self.model.module, model_path)
+                self._save_module()
                 self.save_module_summary(self.writer, self.model.module, self.train_step)
 
     def pre_epoch_finish(self, input, output, metric_manager: MetricManager, train_stage: TrainStage):
@@ -239,23 +246,32 @@ class NetworkTrainer:
     def cleanup(self):
         raise NotImplementedError
 
-    @staticmethod
-    def save_module(module: nn.Module, path: str, save_onnx=False, dummy_input=None):
-        if isinstance(module, nn.parallel.DataParallel):
-            raise TypeError('Cannot save module wrapped with DataParallel!')
-        if save_onnx:
-            if dummy_input is None:
-                raise ValueError('Must provide a valid dummy input.')
-            import onnx
-            # TODO: input / output names?
-            # warning: cannot export DataParallel-wrapped module
-            torch.onnx.export(module, dummy_input, path, verbose=True)
-            # check validity of onnx IR and print the graph
-            model = onnx.load(path)
-            onnx.checker.check_model(model)
-            onnx.helper.printable_graph(model.graph)
+    def _save_module(self, save_onnx=False, prefix=''):
+        if isinstance(self.model, tuple):
+            models = [m.module for m in self.model]
+            input_sizes = self.input_size
         else:
-            torch.save(module, path)
+            models = self.model.module
+            input_sizes = (self.input_size, )
+
+        for model_idx, model in enumerate(models):
+            if save_onnx:
+                import onnx
+                # TODO: input / output names?
+                # warning: cannot export DataParallel-wrapped module
+                path = os.path.join(self.onnx_dir, '{}{}_onnx.pth'.format(prefix, model.__class__.__name__))
+                dummy_input = torch.randn(input_sizes[model_idx])
+                torch.onnx.export(model, dummy_input, path, verbose=True)
+                # check validity of onnx IR and print the graph
+                model = onnx.load(path)
+                onnx.checker.check_model(model)
+                onnx.helper.printable_graph(model.graph)
+            else:
+                if prefix == '':
+                    path = os.path.join(self.model_dir, 'e{:03}_{}.pth'.format(self.epoch, model.__class__.__name__))
+                else:
+                    path = os.path.join(self.model_dir, '{}_{}.pth'.format(prefix, model.__class__.__name__))
+                torch.save(model, path)
 
     @staticmethod
     def log_metric(writer, metrics: dict, epoch: int, step: int, summary_group='train'):
