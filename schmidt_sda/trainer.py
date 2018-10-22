@@ -40,7 +40,8 @@ class SchmidtSDATrainer(NetworkTrainer):
     def forward(self, model, input, *args, **kwargs):
         return model(input[1])  # feed noisy image to the model
 
-    def criterion_input_maker(self, input, output):
+    @staticmethod
+    def criterion_input_maker(input, output, *args, **kwargs):
         output_img, _ = output  # latent vector not used
         clean_img, _ = input
         return output_img, clean_img

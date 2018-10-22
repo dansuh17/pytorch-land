@@ -154,11 +154,27 @@ class NetworkTrainer(ABC):
         test_metrics = self.test()
         print('Training complete.')
 
+    def to_device(self, data):
+        """
+        Send the data to device this trainer is using
+
+        Args:
+            data (tuple|list|torch.Tensor): data
+
+        Returns:
+            device-transferred data
+        """
+        if isinstance(data, tuple):
+            return tuple([d.to(self.device) for d in data])
+        elif isinstance(data, list):
+            return [d.to(self.device) for d in data]
+        return data.to(self.device)
+
     def run_epoch(self, dataloader, train_stage=TrainStage.TRAIN):
         metric_manager = MetricManager()
         dataloader_size = len(dataloader)
         for step, data in enumerate(dataloader):
-            data = self.input_transform(data).to(self.device)  # transform dataloader's data
+            data = self.to_device(self.input_transform(data))  # transform dataloader's data
             output = self.forward(self.model, data)  # feed the data to model
             loss = self.calc_loss(self.criterion, self.criterion_input_maker, data, output)
 
@@ -192,7 +208,8 @@ class NetworkTrainer(ABC):
         return torch.nn.parallel.DataParallel(
             model.to(self.device), device_ids=self.device_ids)
 
-    def criterion_input_maker(self, input, output) -> tuple:
+    @staticmethod
+    def criterion_input_maker(input, output, *args, **kwargs) -> tuple:
         return output, input
 
     @abstractmethod
