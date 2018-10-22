@@ -15,7 +15,7 @@ from tensorboardX import SummaryWriter
 
 class SchmidtSDATrainer(NetworkTrainer):
     def __init__(self):
-        batch_size = 256
+        batch_size = 128
         input_data_dir = 'schmidt_sda_data_in/vctk_processed'
         model = SchmidtSDA(
             input_channel=1,

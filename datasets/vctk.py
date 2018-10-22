@@ -95,7 +95,7 @@ class VCTKLoaderMaker(DataLoaderMaker):
             sampler=sampler.SubsetRandomSampler(self.test_idx),
             pin_memory=True,
             drop_last=True,
-            num_workers=4,
+            num_workers=self.num_workers,
             batch_size=self.batch_size)
         return test_dataloader
 
