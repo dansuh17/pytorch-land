@@ -17,7 +17,7 @@ class TrainStage(Enum):
 
 
 class MetricManager:
-    """Class for managing mutiple metrics."""
+    """Class for managing multiple metrics."""
     def __init__(self):
         self.metric_tracker = defaultdict(list)
 
@@ -170,13 +170,13 @@ class NetworkTrainer(ABC):
             return [d.to(self.device) for d in data]
         return data.to(self.device)
 
-    def run_epoch(self, dataloader, train_stage=TrainStage.TRAIN):
+    def run_epoch(self, dataloader, train_stage: TrainStage):
         metric_manager = MetricManager()
         dataloader_size = len(dataloader)
         for step, data in enumerate(dataloader):
             data = self.to_device(self.input_transform(data))  # transform dataloader's data
             output = self.forward(self.model, data)  # feed the data to model
-            loss = self.calc_loss(self.criterion, self.criterion_input_maker, data, output)
+            loss = self.criterion(*self.criterion_input_maker(data, output))
 
             # metric calculation
             metric = self.make_performance_metric(data, output, loss)
@@ -238,10 +238,6 @@ class NetworkTrainer(ABC):
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-
-    @staticmethod
-    def calc_loss(criterion, criterion_input_maker, input, output):
-        return criterion(*criterion_input_maker(input, output))
 
     @staticmethod
     def make_performance_metric(input, output, loss) -> dict:
