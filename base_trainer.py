@@ -1,6 +1,7 @@
 import os
 from abc import ABC, abstractmethod
 import operator
+import math
 from enum import Enum, unique
 from collections import defaultdict
 import torch
@@ -11,6 +12,9 @@ from tensorboardX import SummaryWriter
 
 @unique
 class TrainStage(Enum):
+    """
+    Enum defining each stages of training process.
+    """
     TRAIN = 'train'
     VALIDATE = 'validate'
     TEST = 'test'
@@ -19,18 +23,43 @@ class TrainStage(Enum):
 class MetricManager:
     """Class for managing multiple metrics."""
     def __init__(self):
-        self.metric_tracker = defaultdict(list)
+        self.metric_counter = defaultdict(int)  # init to 0
+        self.metric_avgs = defaultdict(float)  # init to 0.0
+        self.metric_mins = defaultdict(lambda _: math.inf)
+        self.metric_maxes = defaultdict(lambda _: -math.inf)
 
     def append_metric(self, metric: dict):
-        for key in metric:
-            self.metric_tracker[key].append(metric[key])
+        """
+        Introduce a new metric values and update the statistics.
+        It mainly updates the count, average value, minimum value, and the maximum value.
 
-    def mean(self, key: str):
-        metric_list = self.metric_tracker[key]
-        return sum(metric_list) / len(metric_list)
+        Args:
+            metric (dict): various metric values
+        """
+        for key, val in metric.items():
+            prev_count = self.metric_counter[key]
+            prev_avg = self.metric_avgs[key]
+            total_val = prev_count * prev_avg + val
 
-    def mean_dict(self):
-        return {key: self.mean(key) for key in self.metric_tracker.keys()}
+            # calculate the new average
+            self.metric_avgs[key] = total_val / (prev_count + 1)
+            self.metric_counter[key] = prev_count + 1
+            if val < self.metric_mins[key]:
+                self.metric_mins[key] = val
+            if val > self.metric_maxes[key]:
+                self.metric_maxes[key] = val
+
+    def mean(self, key: str) -> float:
+        """
+        Retrieve the mean value of the given key.
+
+        Args:
+            key (str): the key value
+
+        Returns:
+            the mean value of the key
+        """
+        return self.metric_avgs[key]
 
 
 class NetworkTrainer(ABC):
@@ -259,7 +288,7 @@ class NetworkTrainer(ABC):
         if train_stage == TrainStage.VALIDATE or train_stage == TrainStage.TEST:
             self.log_metric(
                 self.writer,
-                metric_manager.mean_dict(),
+                metric_manager.metric_avgs,
                 self.epoch,
                 self.train_step,
                 summary_group=train_stage.value)
@@ -359,6 +388,7 @@ class NetworkTrainerOld:
     """
 
     def __init__(self):
+        print('THIS CLASS (NetworkTrainerOld) is DEPRECATED. USE NetworkTrainer INSTEAD.')
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.seed = torch.initial_seed()
         print('Using random seed : {}'.format(self.seed))
