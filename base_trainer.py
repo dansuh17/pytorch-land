@@ -25,8 +25,8 @@ class MetricManager:
     def __init__(self):
         self.metric_counter = defaultdict(int)  # init to 0
         self.metric_avgs = defaultdict(float)  # init to 0.0
-        self.metric_mins = defaultdict(lambda _: math.inf)
-        self.metric_maxes = defaultdict(lambda _: -math.inf)
+        self.metric_mins = defaultdict(lambda: math.inf)
+        self.metric_maxes = defaultdict(lambda: -math.inf)
 
     def append_metric(self, metric: dict):
         """
@@ -112,10 +112,10 @@ class NetworkTrainer(ABC):
         # prepare model(s) for training
         if isinstance(model, tuple):  # in case of having multiple models
             self.model_name = '_'.join(map(lambda x: x.__class__.__name__, model))
-            self.model = tuple(map(self.register_model, model))
+            self.model = tuple(map(self._register_model, model))
         else:
             self.model_name = model.__class__.__name__
-            self.model = self.register_model(model)
+            self.model = self._register_model(model)
 
         # setup and create output directories
         self.output_dir = output_dir
@@ -129,14 +129,15 @@ class NetworkTrainer(ABC):
         self.val_dataloader = dataloader_maker.make_validate_dataloader()
         self.test_dataloader = dataloader_maker.make_test_dataloader()
 
+        # save any other states or variables to maintain
         self.input_size = input_size  # must be torch.Size or tuple, or a tuple of them
         self.total_epoch = epoch
         self.criterion = criterion
         self.optimizer = optimizer
         self.lr_scheduler = lr_scheduler
-
         self.writer = SummaryWriter(log_dir=self.log_dir)
 
+        # TODO: initialize training process
         self.epoch = 0
         self.train_step = 0
 
@@ -165,6 +166,7 @@ class NetworkTrainer(ABC):
         return prev_best_metric
 
     def fit(self):
+        """Run the entire training process."""
         best_metric = None
         for _ in range(self.epoch, self.total_epoch):
             self.writer.add_scalar('epoch', self.epoch, self.train_step)
@@ -183,7 +185,7 @@ class NetworkTrainer(ABC):
         test_metrics = self.test()
         print('Training complete.')
 
-    def to_device(self, data):
+    def _to_device(self, data):
         """
         Send the data to device this trainer is using
 
@@ -203,7 +205,7 @@ class NetworkTrainer(ABC):
         metric_manager = MetricManager()
         dataloader_size = len(dataloader)
         for step, data in enumerate(dataloader):
-            data = self.to_device(self.input_transform(data))  # transform dataloader's data
+            data = self._to_device(self.input_transform(data))  # transform dataloader's data
             output = self.forward(self.model, data)  # feed the data to model
             loss = self.criterion(*self.criterion_input_maker(data, output))
 
@@ -233,7 +235,7 @@ class NetworkTrainer(ABC):
     def validate(self):
         return self.run_epoch(self.val_dataloader, TrainStage.VALIDATE)
 
-    def register_model(self, model):
+    def _register_model(self, model):
         return torch.nn.parallel.DataParallel(
             model.to(self.device), device_ids=self.device_ids)
 
