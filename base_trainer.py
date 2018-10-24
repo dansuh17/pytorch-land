@@ -99,6 +99,7 @@ class NetworkTrainer(ABC):
         """
         # initial settings
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
         if seed is None:
             self.seed = torch.initial_seed()
         else:
@@ -137,7 +138,7 @@ class NetworkTrainer(ABC):
         self.lr_scheduler = lr_scheduler
         self.writer = SummaryWriter(log_dir=self.log_dir)
 
-        # TODO: initialize training process
+        # initialize training process
         self.epoch = 0
         self.train_step = 0
 
@@ -152,24 +153,10 @@ class NetworkTrainer(ABC):
         os.makedirs(path, exist_ok=True)
         return path
 
-    def save_best_model(self, prev_best_metric, curr_metric, comparison=operator.lt):
-        if prev_best_metric is None:
-            return curr_metric
-        # compare the standard metric, and if the standard performance metric
-        # is better, then save the best model
-        if comparison(
-                curr_metric.mean(self.standard_metric),
-                prev_best_metric.mean(self.standard_metric)):
-            self._save_module(save_onnx=True, prefix='best_')
-            self._save_module(prefix='best')
-            return curr_metric
-        return prev_best_metric
-
     def fit(self):
         """Run the entire training process."""
         best_metric = None
         for _ in range(self.epoch, self.total_epoch):
-            self.writer.add_scalar('epoch', self.epoch, self.train_step)
 
             train_metrics = self.train()
             # compare the train metric and save the best model - TODO: should I use the validation metric?
@@ -185,23 +172,8 @@ class NetworkTrainer(ABC):
         test_metrics = self.test()
         print('Training complete.')
 
-    def _to_device(self, data):
-        """
-        Send the data to device this trainer is using
-
-        Args:
-            data (tuple|list|torch.Tensor): data
-
-        Returns:
-            device-transferred data
-        """
-        if isinstance(data, tuple):
-            return tuple([d.to(self.device) for d in data])
-        elif isinstance(data, list):
-            return [d.to(self.device) for d in data]
-        return data.to(self.device)
-
     def run_epoch(self, dataloader, train_stage: TrainStage):
+        self.before_epoch(train_stage=train_stage)
         metric_manager = MetricManager()
         dataloader_size = len(dataloader)
         for step, data in enumerate(dataloader):
@@ -274,6 +246,12 @@ class NetworkTrainer(ABC):
     def make_performance_metric(input, output, loss) -> dict:
         return {'loss': loss}
 
+    def before_epoch(self, train_stage: TrainStage):
+        # store the epoch number (to look good in tensorboard), and learning rate
+        if train_stage == TrainStage.TRAIN:
+            self.writer.add_scalar('epoch', self.epoch, self.train_step)
+            self.save_learning_rate(self.writer, self.optimizer, self.train_step)
+
     def post_step(self, input, output, metric: dict, train_stage: TrainStage):
         if train_stage == TrainStage.TRAIN:
             if self.train_step % 20 == 0:
@@ -295,13 +273,42 @@ class NetworkTrainer(ABC):
                 self.train_step,
                 summary_group=train_stage.value)
 
-    def save_checkpoint(self, filename: str):
+        if train_stage == TrainStage.TRAIN:
+            self.save_checkpoint()
+
+    def save_checkpoint(self, prefix=''):
         """Saves the model and training checkpoint.
         The model only saves the model, and it is usually used for inference in the future.
         The checkpoint saves the state dictionary of various modules
         required for training. Usually this information is used to resume training.
         """
-        raise NotImplementedError
+        if isinstance(self.model, tuple):
+            model_state = tuple(map(lambda m: m.module.state_dict(), self.model))
+            optimizer_state = tuple(map(lambda m: m.state_dict(), self.optimizer))
+        else:
+            model_state = self.model.module.state_dict()
+            optimizer_state = self.optimizer.state_dict()
+
+        train_state = {
+            'epoch': self.epoch,
+            'step': self.train_step,
+            'seed': self.seed,
+            'model': model_state,
+            'optimizer': optimizer_state,
+        }
+        cptf = '{}{}_checkpoint_e{}.pth'.format(prefix, self.model_name, self.epoch)
+        torch.save(train_state, os.path.join(self.checkpoint_dir, cptf))
+
+    def resume(self, filename: str):
+        cpt = torch.load(filename)
+        self.seed = cpt['seed']
+        torch.manual_seed(self.seed)
+        self.epoch = cpt['epoch']
+        self.train_step = cpt['step']
+
+        # load the model and optimizer  # TODO: consider where they are tuples
+        self.model = self.model.load_state_dict(cpt['model'])
+        self.optimizer = self.optimizer.load_state_dict(cpt['optimizer'])
 
     def cleanup(self):
         self.writer.close()
@@ -312,6 +319,19 @@ class NetworkTrainer(ABC):
         It is an id() function by default.
         """
         return data
+
+    def save_best_model(self, prev_best_metric, curr_metric, comparison=operator.lt):
+        if prev_best_metric is None:
+            return curr_metric
+        # compare the standard metric, and if the standard performance metric
+        # is better, then save the best model
+        if comparison(
+                curr_metric.mean(self.standard_metric),
+                prev_best_metric.mean(self.standard_metric)):
+            self._save_module(save_onnx=True, prefix='best_')
+            self._save_module(prefix='best')
+            return curr_metric
+        return prev_best_metric
 
     def _save_module(self, save_onnx=False, prefix=''):
         if isinstance(self.model, tuple):
@@ -380,6 +400,22 @@ class NetworkTrainer(ABC):
                         writer.add_histogram(
                             'weight/{}'.format(name), parameter.data.cpu().numpy(), step)
 
+    def _to_device(self, data):
+        """
+        Send the data to device this trainer is using
+
+        Args:
+            data (tuple|list|torch.Tensor): data
+
+        Returns:
+            device-transferred data
+        """
+        if isinstance(data, tuple):
+            return tuple([d.to(self.device) for d in data])
+        elif isinstance(data, list):
+            return [d.to(self.device) for d in data]
+        return data.to(self.device)
+
 
 #### DEPRECATED ####
 class NetworkTrainerOld:
@@ -405,11 +441,6 @@ class NetworkTrainerOld:
         raise NotImplementedError
 
     def save_checkpoint(self, filename: str):
-        """Saves the model and training checkpoint.
-        The model only saves the model, and it is usually used for inference in the future.
-        The checkpoint saves the state dictionary of various modules
-        required for training. Usually this information is used to resume training.
-        """
         raise NotImplementedError
 
     def cleanup(self):

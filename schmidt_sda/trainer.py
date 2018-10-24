@@ -15,6 +15,8 @@ from tensorboardX import SummaryWriter
 
 class SchmidtSDATrainer(NetworkTrainer):
     def __init__(self):
+        self.input_height = 40
+        self.input_width = 40
         batch_size = 128
         input_data_dir = 'schmidt_sda_data_in/vctk_processed'
         model = SchmidtSDA(
@@ -38,6 +40,7 @@ class SchmidtSDATrainer(NetworkTrainer):
         return clean_img, noisy_img
 
     def forward(self, model, input, *args, **kwargs):
+        print(input[1].size())  # TODO: debugging message
         return model(input[1])  # feed noisy image to the model
 
     @staticmethod
@@ -46,8 +49,48 @@ class SchmidtSDATrainer(NetworkTrainer):
         clean_img, _ = input
         return output_img, clean_img
 
-    def save_checkpoint(self, filename: str):
-        pass
+    def pre_epoch_finish(self, input, output, metric_manager, train_stage):
+        super().pre_epoch_finish(input, output, metric_manager, train_stage)
+        # expand variables just to read easily
+        clean_imgs, noisy_imgs = input
+        denoised_img = output
+        nrow = 4
+        self.add_image(clean_imgs, nrow, height=self.input_height, width=self.input_width, name='clean')
+        self.add_image(noisy_imgs, nrow, height=self.input_height, width=self.input_width, name='noisy')
+        self.add_image(denoised_img, nrow, height=self.input_height, width=self.input_width, name='denoised')
+
+    def add_image(self, img, nrow, height, width, name: str):
+        spec = self.make_grid_from_mel(img[:nrow, :].view(-1, 1, height, width))
+        grid = torchvision.utils.make_grid(spec, nrow=nrow, normalize=True)
+        self.writer.add_image('{}/{}'.format(self.epoch, name), grid, self.train_step)
+
+    @staticmethod
+    def make_grid_from_mel(imgs, sr=16000, n_fft=256, n_mels=40):  # TODO: acquire these from constants
+        """
+        Make image grid from a number of normalized db-scale mel-spectrograms.
+
+        Args:
+            imgs (list[torch.FloatTensor]): list of tensors representing images
+            sr (int): sample rate
+            n_fft (int): num_fft
+            n_mels (int): number of mel-spectrogram bins
+
+        Returns:
+            list of tensors representing images
+        """
+        # TODO: make this static resource
+        # inverse of mel spectrogram matrix that can revert mel-spec to power-spectrogram
+        mel_basis_inv = np.matrix(librosa.filters.mel(sr, n_fft, n_mels=n_mels)).I
+        # convert torch Tensor to numpy.ndarray
+        imgs = imgs.cpu().detach().numpy()
+        out_imgs = []
+        for mel_spec in imgs:
+            spec = np.dot(mel_basis_inv, mel_spec)
+            # convert the power spectrum to db for better visualization
+            img = librosa.power_to_db(spec, ref=np.max)
+            height, width = img.shape
+            out_imgs.append(torch.from_numpy(img).float().view(-1, height, width))
+        return out_imgs
 
 
 class SchimdtSDATrainerOld(NetworkTrainerOld):
