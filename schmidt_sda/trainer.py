@@ -15,14 +15,16 @@ from tensorboardX import SummaryWriter
 
 class SchmidtSDATrainer(NetworkTrainer):
     def __init__(self):
+        # prepare inputs for trainer
+        self.input_channel = 1
         self.input_height = 40
         self.input_width = 40
         batch_size = 128
         input_data_dir = 'schmidt_sda_data_in/vctk_processed'
         model = SchmidtSDA(
-            input_channel=1,
-            input_height=40,
-            input_width=40,
+            input_channel=self.input_channel,
+            input_height=self.input_height,
+            input_width=self.input_width,
         )
         dataloader_maker = VCTKLoaderMaker(input_data_dir, batch_size, use_channel=True)
         criterion = nn.MSELoss(size_average=True)
@@ -30,8 +32,13 @@ class SchmidtSDATrainer(NetworkTrainer):
                                lr=0.001)
         lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(
             optimizer, mode='min', verbose=True, factor=0.2, patience=7)
-        super().__init__(model, dataloader_maker, criterion, optimizer, epoch=500,
-                         input_size=(40, 40), num_devices=4, lr_scheduler=lr_scheduler)
+
+        # initialize the trainer
+        super().__init__(model, dataloader_maker, criterion, optimizer,
+                         epoch=500,
+                         input_size=(self.input_channel, self.input_height, self.input_width),
+                         num_devices=4,
+                         lr_scheduler=lr_scheduler)
 
     @staticmethod
     def input_transform(data):
@@ -53,7 +60,7 @@ class SchmidtSDATrainer(NetworkTrainer):
         super().pre_epoch_finish(input, output, metric_manager, train_stage)
         # expand variables just to read easily
         clean_imgs, noisy_imgs = input
-        denoised_img = output
+        denoised_img, _ = output
         nrow = 4
         self.add_image(clean_imgs, nrow, height=self.input_height, width=self.input_width, name='clean')
         self.add_image(noisy_imgs, nrow, height=self.input_height, width=self.input_width, name='noisy')

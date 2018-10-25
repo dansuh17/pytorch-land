@@ -176,24 +176,24 @@ class NetworkTrainer(ABC):
         self.before_epoch(train_stage=train_stage)
         metric_manager = MetricManager()
         dataloader_size = len(dataloader)
-        for step, data in enumerate(dataloader):
-            data = self._to_device(self.input_transform(data))  # transform dataloader's data
-            output = self.forward(self.model, data)  # feed the data to model
-            loss = self.criterion(*self.criterion_input_maker(data, output))
+        for step, input_ in enumerate(dataloader):
+            input_ = self._to_device(self.input_transform(input_))  # transform dataloader's data
+            output = self.forward(self.model, input_)  # feed the data to model
+            loss = self.criterion(*self.criterion_input_maker(input_, output))
 
             # metric calculation
-            metric = self.make_performance_metric(data, output, loss)
+            metric = self.make_performance_metric(input_, output, loss)
             metric_manager.append_metric(metric)
 
             if train_stage == TrainStage.TRAIN:
                 self.update(self.optimizer, loss)
                 self.train_step += 1
 
-            self.post_step(data, output, metric, train_stage=train_stage)
+            self.post_step(input_, output, metric, train_stage=train_stage)
 
             # run pre-epoch-finish after the final step
             if step == dataloader_size - 1:
-                self.pre_epoch_finish(data, output, metric_manager, train_stage=train_stage)
+                self.pre_epoch_finish(input_, output, metric_manager, train_stage=train_stage)
         self.on_epoch_finish(metric_manager, train_stage=train_stage)
         return metric_manager
 
