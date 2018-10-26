@@ -355,7 +355,7 @@ class NetworkTrainer(ABC):
                 # TODO: input / output names?
                 # warning: cannot export DataParallel-wrapped module
                 path = os.path.join(self.onnx_dir, '{}{}_onnx.pth'.format(prefix, model.__class__.__name__))
-                dummy_input = torch.randn((1, ) + input_sizes[model_idx])
+                dummy_input = torch.randn(input_sizes[model_idx]).to(self.device)
                 torch.onnx.export(model, dummy_input, path, verbose=True)
                 # check validity of onnx IR and print the graph
                 model = onnx.load(path)
