@@ -174,12 +174,20 @@ class NetworkTrainer(ABC):
 
     def run_epoch(self, dataloader, train_stage: TrainStage):
         self.before_epoch(train_stage=train_stage)
-        metric_manager = MetricManager()
+
+        metric_manager = MetricManager()  # initialize the metric manager
         dataloader_size = len(dataloader)
         for step, input_ in enumerate(dataloader):
             input_ = self._to_device(self.input_transform(input_))  # transform dataloader's data
-            output = self.forward(self.model, input_)  # feed the data to model
-            loss = self.criterion(*self.criterion_input_maker(input_, output))
+
+            # perform forward and backward passes
+            if train_stage == TrainStage.TRAIN:
+                output = self.forward(self.model, input_)  # feed the data to model
+                loss = self.criterion(*self.criterion_input_maker(input_, output))
+            else:
+                with torch.no_grad():  # do not accumulate gradients if not training
+                    output = self.forward(self.model, input_)  # feed the data to model
+                    loss = self.criterion(*self.criterion_input_maker(input_, output))
 
             # metric calculation
             metric = self.make_performance_metric(input_, output, loss)
@@ -230,17 +238,17 @@ class NetworkTrainer(ABC):
         raise NotImplementedError
 
     @staticmethod
-    def update(optimizer, loss):
+    def update(optimizer: torch.optim.Optimizer, loss):
         """
         Updates the neural network using optimization algorithm and loss gradient.
 
         Args:
-            optimizer:
-            loss:
+            optimizer (torch.optim.Optimizer): optimizers subclassing Optimizer class
+            loss: loss value
         """
         optimizer.zero_grad()
         loss.backward()
-        optimizer.step()
+        optimizer.step(closure=None)
 
     @staticmethod
     def make_performance_metric(input, output, loss) -> dict:
