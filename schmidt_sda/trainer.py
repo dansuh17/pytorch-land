@@ -1,7 +1,7 @@
 import os
+import math
 import librosa
 import numpy as np
-import math
 import torch
 import torch.nn as nn
 import torch.optim as optim

@@ -160,7 +160,7 @@ class NetworkTrainer(ABC):
 
             train_metrics = self.train()
             # compare the train metric and save the best model - TODO: should I use the validation metric?
-            best_metric = self.save_best_model(best_metric, train_metrics)
+            best_metric = self._save_best_model(best_metric, train_metrics)
 
             # run upon validation set
             val_metrics = self.validate()
@@ -328,7 +328,7 @@ class NetworkTrainer(ABC):
         """
         return data
 
-    def save_best_model(self, prev_best_metric, curr_metric, comparison=operator.lt):
+    def _save_best_model(self, prev_best_metric, curr_metric, comparison=operator.lt):
         if prev_best_metric is None:
             return curr_metric
         # compare the standard metric, and if the standard performance metric
@@ -336,7 +336,11 @@ class NetworkTrainer(ABC):
         if comparison(
                 curr_metric.mean(self.standard_metric),
                 prev_best_metric.mean(self.standard_metric)):
-            self._save_module(save_onnx=True, prefix='best_')
+            # onnx model saving may fail due to unsupported operators, etc.
+            try:
+                self._save_module(save_onnx=True, prefix='best_')
+            except RuntimeError as onnx_err:
+                print('Saving onnx model failed : {}'.format(onnx_err))
             self._save_module(prefix='best')
             return curr_metric
         return prev_best_metric
