@@ -314,7 +314,7 @@ class NetworkTrainer(ABC):
         self.epoch = cpt['epoch']
         self.train_step = cpt['step']
 
-        # load the model and optimizer  # TODO: consider where they are tuples
+        # load the model and optimizer  # TODO: consider when they are tuples
         self.model = self.model.load_state_dict(cpt['model'])
         self.optimizer = self.optimizer.load_state_dict(cpt['optimizer'])
 
