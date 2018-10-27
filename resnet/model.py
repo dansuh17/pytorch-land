@@ -89,7 +89,8 @@ class ResNet32(nn.Module):
         self.feature_dim = input_dim // dim_shrink_rate
         self.fc = nn.Linear(64 * self.feature_dim * self.feature_dim, num_classes)
 
-        self.apply(init_weights)  # initielize weights for all submodules
+        # initialize weights for all submodules
+        self.apply(init_weights)
 
     def forward(self, x):
         x = self.conv_1(x)

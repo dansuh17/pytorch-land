@@ -168,6 +168,8 @@ class NetworkTrainer(ABC):
             # update learning rate based on validation metric
             if self.lr_scheduler is not None:
                 self.lr_scheduler.step(val_metrics.mean(self.standard_metric))
+
+            self.epoch += 1
         # run upon test set
         test_metrics = self.test()
         print('Training complete.')

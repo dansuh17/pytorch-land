@@ -6,6 +6,7 @@ import torch.nn as nn
 import torch.optim as optim
 import torchvision
 from .schmidt_sda import SchmidtSDA
+from .dae_unet import DansuhDenoisingCNN
 from base_trainer import NetworkTrainer
 
 
@@ -20,11 +21,19 @@ class SchmidtSDATrainer(NetworkTrainer):
         batch_size = config['batch_size']
         input_data_dir = config['data_dir']
 
-        model = SchmidtSDA(
-            input_channel=self.input_channel,
-            input_height=self.input_height,
-            input_width=self.input_width,
-        )
+        # create model
+        model_name = config['model_name']
+        if model_name == 'schmidt':
+            model = SchmidtSDA(
+                input_channel=self.input_channel,
+                input_height=self.input_height,
+                input_width=self.input_width,
+            )
+        elif model_name == 'dansuh':
+            model = DansuhDenoisingCNN()
+        else:
+            raise ValueError('Invalid model name : {}'.format(model_name))
+
         dataloader_maker = VCTKLoaderMaker(input_data_dir, batch_size, use_channel=True)
         criterion = nn.MSELoss(size_average=True)
         optimizer = optim.Adam(params=model.parameters(),
