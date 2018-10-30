@@ -7,7 +7,7 @@ class Generator(nn.Module):
     def __init__(self, input_dim: int, img_size: tuple):
         super().__init__()
         self.img_size = img_size
-        numel = reduce(lambda x, y: x * y, img_size)
+        self.numel = reduce(lambda x, y: x * y, img_size)
         # create model with 5 stacks of linear layer
         self.net = nn.Sequential(
             nn.Linear(in_features=input_dim, out_features=128),
@@ -22,13 +22,13 @@ class Generator(nn.Module):
             nn.Linear(512, 1024),
             nn.BatchNorm1d(1024),
             nn.ReLU(inplace=True),
-            nn.Linear(1024, numel),
+            nn.Linear(1024, self.numel),
             nn.Tanh(),
         )
 
     def forward(self, x):
         x = self.net(x)
-        x = x.view(x.size(0), self.img_size)  # resize to image
+        x = x.view(x.size(0), *self.img_size)  # resize to image
         return x
 
 
@@ -62,4 +62,5 @@ if __name__ == '__main__':
     d = Discriminator(img_size=(1, 28, 28))
     print(d)
     disc_out = d(output)
+    print(disc_out)
     print(disc_out.size())

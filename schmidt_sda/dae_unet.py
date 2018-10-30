@@ -80,6 +80,7 @@ class DansuhDenoisingCNN(nn.Module):
 
 if __name__ == '__main__':
     net = DansuhDenoisingCNN()
+    print(net)
     dummy_input = torch.randn((1, 1, 40, 40))
     out = net(dummy_input)
     print(out.size())

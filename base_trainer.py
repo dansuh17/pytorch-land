@@ -6,6 +6,7 @@ from enum import Enum, unique
 from collections import defaultdict
 import torch
 import torch.nn as nn
+from torch.optim.optimizer import Optimizer
 from datasets.loader_maker import DataLoaderMaker
 from tensorboardX import SummaryWriter
 
@@ -88,7 +89,7 @@ class NetworkTrainer(ABC):
             model (nn.Module | tuple[nn.Module]): network model(s)
             dataloader_maker (DataLoaderMaker): instance creating dataloaders
             criterion: training criterion (a.k.a. loss function)
-            optimizer: gradient descent optimizer
+            optimizer (Optimizer | tuple[Optimizer]): gradient descent optimizer
             epoch: total epochs to train (the end epoch)
             input_size (tuple[int]|tuple[tuple[int]]): size of inputs
                 - must match the number of models provided
@@ -174,6 +175,10 @@ class NetworkTrainer(ABC):
         test_metrics = self.test()
         print('Training complete.')
 
+    @abstractmethod
+    def run_step(self, model, criteria, input_, train_stage: TrainStage):
+        return None, None
+
     def run_epoch(self, dataloader, train_stage: TrainStage):
         self.before_epoch(train_stage=train_stage)
 
@@ -182,22 +187,11 @@ class NetworkTrainer(ABC):
         for step, input_ in enumerate(dataloader):
             input_ = self._to_device(self.input_transform(input_))  # transform dataloader's data
 
-            # perform forward and backward passes
-            if train_stage == TrainStage.TRAIN:
-                output = self.forward(self.model, input_)  # feed the data to model
-                loss = self.criterion(*self.criterion_input_maker(input_, output))
-            else:
-                with torch.no_grad():  # do not accumulate gradients if not training
-                    output = self.forward(self.model, input_)  # feed the data to model
-                    loss = self.criterion(*self.criterion_input_maker(input_, output))
+            output, loss = self.run_step(self.model, self.criterion, input_, train_stage)
 
             # metric calculation
             metric = self.make_performance_metric(input_, output, loss)
             metric_manager.append_metric(metric)
-
-            if train_stage == TrainStage.TRAIN:
-                self.update(self.optimizer, loss)
-                self.train_step += 1
 
             self.post_step(input_, output, metric, train_stage=train_stage)
 
@@ -222,38 +216,7 @@ class NetworkTrainer(ABC):
             model.to(self.device), device_ids=self.device_ids)
 
     @staticmethod
-    def criterion_input_maker(input, output, *args, **kwargs) -> tuple:
-        return output, input
-
-    @abstractmethod
-    def forward(self, model, input, *args, **kwargs):
-        """
-        Method for model inference.
-
-        Args:
-            model (nn.Module | tuple[nn.Module]): neural net model
-            input (torch.Tensor | tuple[nn.Module]): input tensor
-
-        Returns:
-            output (torch.Tensor | tuple[nn.Module]): inference result
-        """
-        raise NotImplementedError
-
-    @staticmethod
-    def update(optimizer: torch.optim.Optimizer, loss):
-        """
-        Updates the neural network using optimization algorithm and loss gradient.
-
-        Args:
-            optimizer (torch.optim.Optimizer): optimizers subclassing Optimizer class
-            loss: loss value
-        """
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step(closure=None)
-
-    @staticmethod
-    def make_performance_metric(input, output, loss) -> dict:
+    def make_performance_metric(input_, output, loss) -> dict:
         return {'loss': loss}
 
     def before_epoch(self, train_stage: TrainStage):
@@ -294,9 +257,12 @@ class NetworkTrainer(ABC):
         """
         if isinstance(self.model, tuple):
             model_state = tuple(map(lambda m: m.module.state_dict(), self.model))
-            optimizer_state = tuple(map(lambda m: m.state_dict(), self.optimizer))
         else:
             model_state = self.model.module.state_dict()
+
+        if isinstance(self.optimizer, tuple):
+            optimizer_state = tuple(map(lambda m: m.state_dict(), self.optimizer))
+        else:
             optimizer_state = self.optimizer.state_dict()
 
         train_state = {
