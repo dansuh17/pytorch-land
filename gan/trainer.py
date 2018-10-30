@@ -29,10 +29,11 @@ class GanTrainer(NetworkTrainer):
 
     def run_step(self, model, criteria, input_, train_stage):
         # required information
-        batch_size = input_[0]
+        imgs = input_[0]
+        batch_size = imgs.size()[0]
         latent_dim = self.input_size[0]
-        ones = torch.ones((batch_size, ))
-        zeros = torch.zeros((batch_size, ))
+        ones = torch.ones((batch_size, 1))
+        zeros = torch.zeros((batch_size, 1))
 
         generator, discriminator = model
         optimizer_g, optimizer_d = self.optimizer
@@ -46,6 +47,7 @@ class GanTrainer(NetworkTrainer):
 
         loss_g = criteria(classified_fake, ones)
 
+        # update parameters if training
         if train_stage == TrainStage.TRAIN:
             optimizer_g.zero_grad()
             loss_g.backward()
@@ -53,11 +55,12 @@ class GanTrainer(NetworkTrainer):
 
         # train discriminator
         classified_fake = classified_fake.detach()  # prevent training generator
-        classified_real = discriminator(input_)
+        classified_real = discriminator(imgs)
         fake_loss = criteria(classified_fake, zeros)
         real_loss = criteria(classified_real, ones)
         loss_d = (real_loss + fake_loss) / 2
 
+        # update parameters if training
         if train_stage == TrainStage.TRAIN:
             optimizer_d.zero_grad()
             loss_d.backward()
@@ -70,6 +73,10 @@ class GanTrainer(NetworkTrainer):
             self.train_step += 1
 
         return output, loss
+
+    @property
+    def standard_metric(self):
+        return 'g_loss', 'd_loss'
 
     @staticmethod
     def make_performance_metric(input_, output, loss):

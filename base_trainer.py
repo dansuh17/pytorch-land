@@ -161,14 +161,22 @@ class NetworkTrainer(ABC):
 
             train_metrics = self.train()
             # compare the train metric and save the best model - TODO: should I use the validation metric?
-            best_metric = self._save_best_model(best_metric, train_metrics)
+            best_metric = self._save_best_model(self.model, best_metric, train_metrics)
 
             # run upon validation set
             val_metrics = self.validate()
 
             # update learning rate based on validation metric
             if self.lr_scheduler is not None:
-                self.lr_scheduler.step(val_metrics.mean(self.standard_metric))
+                if isinstance(self.lr_scheduler, tuple):
+                    lr_scheduler = self.lr_scheduler
+                    metrics = self.standard_metric
+                else:
+                    lr_scheduler = (self.lr_scheduler, )
+                    metrics = (self.standard_metric, )
+
+                for idx, lrs in enumerate(lr_scheduler):
+                    lrs.step(val_metrics.mean(self.standard_metric))
 
             self.epoch += 1
         # run upon test set
@@ -296,50 +304,45 @@ class NetworkTrainer(ABC):
         """
         return data
 
-    def _save_best_model(self, prev_best_metric, curr_metric, comparison=operator.lt):
+    def _save_best_model(self, model, prev_best_metric, curr_metric, comparison=operator.lt):
         if prev_best_metric is None:
             return curr_metric
         # compare the standard metric, and if the standard performance metric
         # is better, then save the best model
-        if comparison(
-                curr_metric.mean(self.standard_metric),
-                prev_best_metric.mean(self.standard_metric)):
-            # onnx model saving may fail due to unsupported operators, etc.
-            try:
-                self._save_module(save_onnx=True, prefix='best_')
-            except RuntimeError as onnx_err:
-                print('Saving onnx model failed : {}'.format(onnx_err))
-            self._save_module(prefix='best')
-            return curr_metric
+        if not isinstance(model, tuple):
+            model = (model, )
+
+        for idx, m in enumerate(model):
+            if comparison(
+                    curr_metric.mean(self.standard_metric[idx]),
+                    prev_best_metric.mean(self.standard_metric[idx])):
+                # onnx model saving may fail due to unsupported operators, etc.
+                try:
+                    self._save_module(m.module, self.input_size[idx], save_onnx=True, prefix='best_')
+                except RuntimeError as onnx_err:
+                    print('Saving onnx model failed : {}'.format(onnx_err))
+                self._save_module(m.module, self.input_size[idx], prefix='best')
+                return curr_metric
         return prev_best_metric
 
-    def _save_module(self, save_onnx=False, prefix=''):
-        if isinstance(self.model, tuple):
-            # warning: cannot export DataParallel-wrapped module
-            models = [m.module for m in self.model]
-            input_sizes = self.input_size
+    def _save_module(self, module, input_size, save_onnx=False, prefix=''):
+        if save_onnx:
+            import onnx
+            # TODO: input / output names?
+            path = os.path.join(self.onnx_dir, '{}{}_onnx.pth'.format(prefix, module.__class__.__name__))
+            # add batch dimension to the dummy input sizes
+            dummy_input = torch.randn((1, ) + input_size).to(self.device)
+            torch.onnx.export(module, dummy_input, path, verbose=True)
+            # check validity of onnx IR and print the graph
+            model = onnx.load(path)
+            onnx.checker.check_model(model)
+            onnx.helper.printable_graph(model.graph)
         else:
-            models = (self.model.module, )
-            input_sizes = (self.input_size, )
-
-        for model_idx, model in enumerate(models):
-            if save_onnx:
-                import onnx
-                # TODO: input / output names?
-                path = os.path.join(self.onnx_dir, '{}{}_onnx.pth'.format(prefix, model.__class__.__name__))
-                # add batch dimension to the dummy input sizes
-                dummy_input = torch.randn((1, ) + input_sizes[model_idx]).to(self.device)
-                torch.onnx.export(model, dummy_input, path, verbose=True)
-                # check validity of onnx IR and print the graph
-                model = onnx.load(path)
-                onnx.checker.check_model(model)
-                onnx.helper.printable_graph(model.graph)
+            if prefix == '':
+                path = os.path.join(self.model_dir, 'e{:03}_{}.pth'.format(self.epoch, module.__class__.__name__))
             else:
-                if prefix == '':
-                    path = os.path.join(self.model_dir, 'e{:03}_{}.pth'.format(self.epoch, model.__class__.__name__))
-                else:
-                    path = os.path.join(self.model_dir, '{}_{}.pth'.format(prefix, model.__class__.__name__))
-                torch.save(model, path)
+                path = os.path.join(self.model_dir, '{}_{}.pth'.format(prefix, module.__class__.__name__))
+            torch.save(module, path)
 
     @staticmethod
     def log_metric(writer, metrics: dict, epoch: int, step: int, summary_group='train'):
@@ -352,9 +355,13 @@ class NetworkTrainer(ABC):
 
     @staticmethod
     def save_learning_rate(writer, optimizer, step: int):
-        for idx, param_group in enumerate(optimizer.param_groups):
-            lr = param_group['lr']
-            writer.add_scalar('lr/{}'.format(idx), lr, step)
+        if not isinstance(optimizer, tuple):
+            optimizer = (optimizer, )
+
+        for opt in optimizer:
+            for idx, param_group in enumerate(opt.param_groups):
+                lr = param_group['lr']
+                writer.add_scalar('lr/{}'.format(idx), lr, step)
 
     @staticmethod
     def save_module_summary(writer, module: nn.Module, step: int, save_histogram=False, verbose=False):
