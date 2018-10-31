@@ -26,10 +26,18 @@ class Generator(nn.Module):
             nn.Tanh(),
         )
 
+        self.apply(self.init_weights)
+
     def forward(self, x):
         x = self.net(x)
         x = x.view(x.size(0), *self.img_size)  # resize to image
         return x
+
+    @staticmethod
+    def init_weights(m):
+        if isinstance(m, nn.Linear):
+            nn.init.kaiming_uniform_(m.weight)
+            nn.init.constant_(m.bias, 0)
 
 
 class Discriminator(nn.Module):
@@ -47,9 +55,17 @@ class Discriminator(nn.Module):
             nn.Sigmoid(),
         )
 
+        self.apply(self.init_weights)
+
     def forward(self, x):
         x = x.view(x.size(0), -1)
         return self.net(x)
+
+    @staticmethod
+    def init_weights(m):
+        if isinstance(m, nn.Linear):
+            nn.init.kaiming_uniform_(m.weight)
+            nn.init.constant_(m.bias, 0)
 
 
 if __name__ == '__main__':

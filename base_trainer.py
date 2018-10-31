@@ -13,9 +13,7 @@ from tensorboardX import SummaryWriter
 
 @unique
 class TrainStage(Enum):
-    """
-    Enum defining each stages of training process.
-    """
+    """Enum defining each stages of training process."""
     TRAIN = 'train'
     VALIDATE = 'validate'
     TEST = 'test'
@@ -61,6 +59,9 @@ class MetricManager:
             the mean value of the key
         """
         return self.metric_avgs[key]
+
+    def set_mean(self, key: str, val):
+        self.metric_avgs[key] = val
 
 
 class NetworkTrainer(ABC):
@@ -168,12 +169,8 @@ class NetworkTrainer(ABC):
 
             # update learning rate based on validation metric
             if self.lr_scheduler is not None:
-                if isinstance(self.lr_scheduler, tuple):
-                    lr_scheduler = self.lr_scheduler
-                    metrics = self.standard_metric
-                else:
-                    lr_scheduler = (self.lr_scheduler, )
-                    metrics = (self.standard_metric, )
+                lr_scheduler = self._make_tuple(self.lr_scheduler)
+                metrics = self._make_tuple(self.standard_metric)
 
                 for idx, lrs in enumerate(lr_scheduler):
                     lrs.step(val_metrics.mean(self.standard_metric))
@@ -184,8 +181,8 @@ class NetworkTrainer(ABC):
         print('Training complete.')
 
     @abstractmethod
-    def run_step(self, model, criteria, input_, train_stage: TrainStage):
-        return None, None
+    def run_step(self, model, criteria, optimizer, input_, train_stage: TrainStage):
+        raise NotImplementedError
 
     def run_epoch(self, dataloader, train_stage: TrainStage):
         self.before_epoch(train_stage=train_stage)
@@ -195,7 +192,8 @@ class NetworkTrainer(ABC):
         for step, input_ in enumerate(dataloader):
             input_ = self._to_device(self.input_transform(input_))  # transform dataloader's data
 
-            output, loss = self.run_step(self.model, self.criterion, input_, train_stage)
+            output, loss = self.run_step(
+                self.model, self.criterion, self.optimizer, input_, train_stage)
 
             # metric calculation
             metric = self.make_performance_metric(input_, output, loss)
@@ -225,7 +223,7 @@ class NetworkTrainer(ABC):
 
     @staticmethod
     def make_performance_metric(input_, output, loss) -> dict:
-        return {'loss': loss}
+        return {'loss': loss.item()}
 
     def before_epoch(self, train_stage: TrainStage):
         # store the epoch number (to look good in tensorboard), and learning rate
@@ -239,10 +237,10 @@ class NetworkTrainer(ABC):
                 self.log_metric(self.writer, metric, self.epoch, self.train_step)
 
             if self.train_step % 500 == 0:  # save models
-                self._save_module()
-                self.save_module_summary(self.writer, self.model.module, self.train_step)
+                self._save_all_modules()
+                self._save_module_summary_all()
 
-    def pre_epoch_finish(self, input, output, metric_manager: MetricManager, train_stage: TrainStage):
+    def pre_epoch_finish(self, input_, output, metric_manager: MetricManager, train_stage: TrainStage):
         pass
 
     def on_epoch_finish(self, metric_manager: MetricManager, train_stage: TrainStage):
@@ -304,28 +302,62 @@ class NetworkTrainer(ABC):
         """
         return data
 
+    @staticmethod
+    def _make_tuple(obj):
+        if isinstance(obj, tuple):
+            return obj
+        else:
+            return obj,
+
     def _save_best_model(self, model, prev_best_metric, curr_metric, comparison=operator.lt):
         if prev_best_metric is None:
             return curr_metric
-        # compare the standard metric, and if the standard performance metric
-        # is better, then save the best model
-        if not isinstance(model, tuple):
-            model = (model, )
 
-        for idx, m in enumerate(model):
+        # make tuples so that it is easier to iterate
+        model = self._make_tuple(model)
+        input_size = self._make_tuple(self.input_size)
+        standard_metric = self._make_tuple(self.standard_metric)
+
+        # match the length
+        if len(standard_metric) == 1 and len(model) != 1:
+            standard_metric *= len(model)
+
+        best_metric = prev_best_metric
+        for m, std_metric, input_sz in zip(model, standard_metric, input_size):
+            # compare the standard metric, and if the standard performance metric
+            # is better, then save the best model
             if comparison(
-                    curr_metric.mean(self.standard_metric[idx]),
-                    prev_best_metric.mean(self.standard_metric[idx])):
+                    curr_metric.mean(std_metric),
+                    prev_best_metric.mean(std_metric)):
                 # onnx model saving may fail due to unsupported operators, etc.
                 try:
-                    self._save_module(m.module, self.input_size[idx], save_onnx=True, prefix='best_')
+                    self._save_module(m.module, input_sz, save_onnx=True, prefix='best_')
                 except RuntimeError as onnx_err:
                     print('Saving onnx model failed : {}'.format(onnx_err))
-                self._save_module(m.module, self.input_size[idx], prefix='best')
-                return curr_metric
-        return prev_best_metric
+                self._save_module(m.module, input_sz, prefix='best')
+                best_metric.set_mean(std_metric, curr_metric.mean(std_metric))
+        return best_metric
 
-    def _save_module(self, module, input_size, save_onnx=False, prefix=''):
+    def _save_all_modules(self):
+        models = self._make_tuple(self.model)
+        input_sizes = self._make_tuple(self.input_size)
+
+        for m, input_sz in zip(models, input_sizes):
+            self._save_module(m.module, input_sz)
+
+    def _save_module(self, module, input_size: tuple, save_onnx=False, prefix=''):
+        """
+        Saves a single module.
+
+        Args:
+            module:
+            input_size:
+            save_onnx:
+            prefix:
+
+        Returns:
+
+        """
         if save_onnx:
             import onnx
             # TODO: input / output names?
@@ -338,17 +370,17 @@ class NetworkTrainer(ABC):
             onnx.checker.check_model(model)
             onnx.helper.printable_graph(model.graph)
         else:
+            # note epoch for default prefix
             if prefix == '':
-                path = os.path.join(self.model_dir, 'e{:03}_{}.pth'.format(self.epoch, module.__class__.__name__))
-            else:
-                path = os.path.join(self.model_dir, '{}_{}.pth'.format(prefix, module.__class__.__name__))
+                prefix = 'e{:03}'.format(self.epoch)
+            path = os.path.join(self.model_dir, '{}_{}.pth'.format(prefix, module.__class__.__name__))
             torch.save(module, path)
 
     @staticmethod
     def log_metric(writer, metrics: dict, epoch: int, step: int, summary_group='train'):
-        log = 'Epoch ({}): {}\tstep: {}\t'.format(summary_group, epoch, step)
+        log = 'Epoch ({}): {:03}  step: {}\t'.format(summary_group, epoch, step)
         for metric_name, val in metrics.items():
-            log += '{}: {:.06f}\t'.format(metric_name, val)
+            log += '{}: {:.06f}   '.format(metric_name, val)
             # write to summary writer
             writer.add_scalar('{}/{}'.format(summary_group, metric_name), val, step)
         print(log)
@@ -362,6 +394,13 @@ class NetworkTrainer(ABC):
             for idx, param_group in enumerate(opt.param_groups):
                 lr = param_group['lr']
                 writer.add_scalar('lr/{}'.format(idx), lr, step)
+
+    def _save_module_summary_all(self, **kwargs):
+        models = self._make_tuple(self.model)
+        input_sizes = self._make_tuple(self.input_size)
+
+        for m, input_sz in zip(models, input_sizes):
+            self.save_module_summary(self.writer, m.module, self.train_step, **kwargs)
 
     @staticmethod
     def save_module_summary(writer, module: nn.Module, step: int, save_histogram=False, verbose=False):
