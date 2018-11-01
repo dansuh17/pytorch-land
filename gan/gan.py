@@ -12,16 +12,16 @@ class Generator(nn.Module):
         self.net = nn.Sequential(
             nn.Linear(in_features=input_dim, out_features=128),
             nn.BatchNorm1d(128),
-            nn.ReLU(inplace=True),
+            nn.LeakyReLU(0.2, inplace=True),
             nn.Linear(128, 256),
             nn.BatchNorm1d(256),
-            nn.ReLU(inplace=True),
+            nn.LeakyReLU(0.2, inplace=True),
             nn.Linear(256, 512),
             nn.BatchNorm1d(512),
-            nn.ReLU(inplace=True),
+            nn.LeakyReLU(0.2, inplace=True),
             nn.Linear(512, 1024),
             nn.BatchNorm1d(1024),
-            nn.ReLU(inplace=True),
+            nn.LeakyReLU(0.2, inplace=True),
             nn.Linear(1024, self.numel),
             nn.Tanh(),
         )
@@ -45,13 +45,16 @@ class Discriminator(nn.Module):
         super().__init__()
         numel = reduce(lambda x, y: x * y, img_size)
         self.net = nn.Sequential(
-            nn.Linear(in_features=numel, out_features=512),
-            nn.ReLU(inplace=True),
+            nn.Linear(in_features=numel, out_features=1024),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Dropout(),
+            nn.Linear(1024, 512),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Dropout(),
             nn.Linear(512, 256),
-            nn.ReLU(inplace=True),
-            nn.Linear(256, 128),
-            nn.ReLU(inplace=True),
-            nn.Linear(128, 1),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Dropout(),
+            nn.Linear(256, 1),
             nn.Sigmoid(),
         )
 

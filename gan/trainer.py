@@ -9,41 +9,42 @@ from .gan import Generator, Discriminator
 
 class GanTrainer(NetworkTrainer):
     def __init__(self):
-        g_input = (100, )
+        input_dim = 100
+        g_input = (input_dim, )
         self.height = 28
         self.width = 28
         img_size = (1, self.height, self.width)
         inputs = (g_input, img_size)
-        generator = Generator(input_dim=100, img_size=img_size)
+        generator = Generator(input_dim=input_dim, img_size=img_size)
         discriminator = Discriminator(img_size=img_size)
         models = (generator, discriminator)
 
         loader_maker = MNISTLoaderMaker(data_root='data_in', batch_size=128)
         criterion = nn.BCELoss()  # binary cross entropy loss
 
-        optimizer_g = torch.optim.Adam(generator.parameters(), lr=0.0002, betas=(0.5, 0.999))
-        optimizer_d = torch.optim.Adam(discriminator.parameters(), lr=0.0001, betas=(0.5, 0.999))
+        optimizer_g = torch.optim.Adam(generator.parameters(), lr=0.0002)
+        optimizer_d = torch.optim.Adam(discriminator.parameters(), lr=0.0001)
         optimizers = (optimizer_g, optimizer_d)
 
         lr_scheduler_g = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer_g, mode='min', verbose=True, factor=0.2, patience=7)
+            optimizer_g, mode='min', verbose=True, factor=0.9, patience=10)
         lr_scheduler_d = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer_d, mode='min', verbose=True, factor=0.2, patience=7)
+            optimizer_d, mode='min', verbose=True, factor=0.9, patience=10)
         super().__init__(
             models, loader_maker, criterion, optimizers,
-            epoch=100, input_size=inputs, lr_scheduler=(lr_scheduler_g, lr_scheduler_d))
+            epoch=200, input_size=inputs, lr_scheduler=(lr_scheduler_g, lr_scheduler_d))
 
-        self.train_g_after_epoch = 1
+        self.skip_g_per_epochs = -1
         self.iter_g = 1
-        self.iter_d = 2
+        self.iter_d = 1
 
     def run_step(self, model, criteria, optimizer, input_, train_stage):
         # required information
         imgs = input_[0]
         batch_size = imgs.size()[0]
         latent_dim = self.input_size[0]
-        ones = torch.ones((batch_size, 1))  # mark valid
-        zeros = torch.zeros((batch_size, 1))  # mark invalid
+        ones = torch.ones((batch_size, 1)).to(self.device)  # mark valid
+        zeros = torch.zeros((batch_size, 1)).to(self.device)  # mark invalid
 
         generator, discriminator = model
         optimizer_g, optimizer_d = optimizer
@@ -55,7 +56,7 @@ class GanTrainer(NetworkTrainer):
         # train generator
         for _ in range(self.iter_g):
             # generate latent noise vector
-            noise = torch.randn((batch_size, ) + latent_dim)
+            noise = torch.randn((batch_size, ) + latent_dim).to(self.device)
 
             generated = generator(noise)
             classified_fake = discriminator(generated)
@@ -63,7 +64,7 @@ class GanTrainer(NetworkTrainer):
             loss_g = criteria(classified_fake, ones)  # generator wants to make generated images 'valid'
 
             # update parameters if training
-            if train_stage == TrainStage.TRAIN and self.epoch > self.train_g_after_epoch:
+            if train_stage == TrainStage.TRAIN and self.epoch > self.skip_g_per_epochs:
                 optimizer_g.zero_grad()
                 loss_g.backward()
                 optimizer_g.step()
@@ -74,13 +75,16 @@ class GanTrainer(NetworkTrainer):
         generated = generated.detach()
 
         for _ in range(self.iter_d):
+            noise = torch.randn((batch_size, ) + latent_dim)
+
             # train discriminator
-            classified_fake = discriminator(generated)
+            classified_fake = discriminator(generator(noise).detach())
             classified_real = discriminator(imgs)
 
             fake_loss = criteria(classified_fake, zeros)
             real_loss = criteria(classified_real, ones)
-            loss_d = (real_loss + fake_loss) / 2
+            # loss_d = (real_loss + fake_loss) / 2
+            loss_d = real_loss + fake_loss
 
             # update parameters if training
             if train_stage == TrainStage.TRAIN:
@@ -91,8 +95,8 @@ class GanTrainer(NetworkTrainer):
                 break
 
         # collect outputs and losses
-        output = (generated, classified_fake, classified_real, noise)
-        loss = (loss_g, loss_d)
+        output = (generated, classified_fake, classified_real, noise, imgs)
+        loss = (loss_g, loss_d, fake_loss, real_loss)
 
         if train_stage == TrainStage.TRAIN:
             self.train_step += 1
@@ -105,7 +109,7 @@ class GanTrainer(NetworkTrainer):
 
     @staticmethod
     def make_performance_metric(input_, output, loss):
-        _, classified_fake, classified_real, _ = output
+        _, classified_fake, classified_real, _, _ = output
         true_negative = torch.sum(classified_fake < 0.5)
         true_positive = torch.sum(classified_real > 0.5)
         numel = torch.numel(classified_fake)
@@ -117,6 +121,8 @@ class GanTrainer(NetworkTrainer):
         return {
             'g_loss': loss[0].item(),
             'd_loss': loss[1].item(),
+            'd_loss_fake': loss[2].item(),
+            'd_loss_real': loss[3].item(),
             'd_accuracy': accuracy.item(),
             'd_specificity': specificity.item(),
             'd_recall': recall.item(),
@@ -124,9 +130,10 @@ class GanTrainer(NetworkTrainer):
 
     def pre_epoch_finish(self, input, output, metric_manager, train_stage: TrainStage):
         if train_stage == TrainStage.VALIDATE:
-            generated_imgs, _, _, _ = output
+            generated_imgs, _, _, _, real_imgs = output
             self.add_generated_image(
                 generated_imgs, nrow=4, height=self.height, width=self.width, name='generated')
+            self.add_generated_image(real_imgs, nrow=4, height=self.height, width=self.width, name='real')
 
     def add_generated_image(self, imgs, nrow, height, width, name: str):
         grid = torchvision.utils.make_grid(imgs[:nrow, :], nrow=nrow, normalize=True)
