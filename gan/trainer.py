@@ -35,7 +35,7 @@ class GanTrainer(NetworkTrainer):
             epoch=200, input_size=inputs, lr_scheduler=(lr_scheduler_g, lr_scheduler_d))
 
         self.skip_g_per_epochs = -1
-        self.iter_g = 1
+        self.iter_g = 8
         self.iter_d = 1
 
     def run_step(self, model, criteria, optimizer, input_, train_stage):

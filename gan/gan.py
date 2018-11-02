@@ -47,13 +47,13 @@ class Discriminator(nn.Module):
         self.net = nn.Sequential(
             nn.Linear(in_features=numel, out_features=1024),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Dropout(),
+            nn.Dropout(0.3),
             nn.Linear(1024, 512),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Dropout(),
+            nn.Dropout(0.3),
             nn.Linear(512, 256),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Dropout(),
+            nn.Dropout(0.3),
             nn.Linear(256, 1),
             nn.Sigmoid(),
         )
