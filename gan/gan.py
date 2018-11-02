@@ -11,7 +11,6 @@ class Generator(nn.Module):
         # create model with 5 stacks of linear layer
         self.net = nn.Sequential(
             nn.Linear(in_features=input_dim, out_features=128),
-            nn.BatchNorm1d(128),
             nn.LeakyReLU(0.2, inplace=True),
             nn.Linear(128, 256),
             nn.BatchNorm1d(256),
@@ -28,10 +27,10 @@ class Generator(nn.Module):
 
         self.apply(self.init_weights)
 
-    def forward(self, x):
-        x = self.net(x)
-        x = x.view(x.size(0), *self.img_size)  # resize to image
-        return x
+    def forward(self, z):
+        gen = self.net(z)
+        gen = gen.view(gen.size(0), *self.img_size)  # resize to image
+        return gen
 
     @staticmethod
     def init_weights(m):
@@ -45,15 +44,10 @@ class Discriminator(nn.Module):
         super().__init__()
         numel = reduce(lambda x, y: x * y, img_size)
         self.net = nn.Sequential(
-            nn.Linear(in_features=numel, out_features=1024),
+            nn.Linear(in_features=numel, out_features=512),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Dropout(0.3),
-            nn.Linear(1024, 512),
-            nn.LeakyReLU(0.2, inplace=True),
-            nn.Dropout(0.3),
             nn.Linear(512, 256),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Dropout(0.3),
             nn.Linear(256, 1),
             nn.Sigmoid(),
         )
@@ -61,8 +55,8 @@ class Discriminator(nn.Module):
         self.apply(self.init_weights)
 
     def forward(self, x):
-        x = x.view(x.size(0), -1)
-        return self.net(x)
+        x_flat = x.view(x.size(0), -1)
+        return self.net(x_flat)
 
     @staticmethod
     def init_weights(m):

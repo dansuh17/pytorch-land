@@ -23,7 +23,7 @@ class GanTrainer(NetworkTrainer):
         criterion = nn.BCELoss()  # binary cross entropy loss
 
         optimizer_g = torch.optim.Adam(generator.parameters(), lr=0.0002)
-        optimizer_d = torch.optim.Adam(discriminator.parameters(), lr=0.0001)
+        optimizer_d = torch.optim.Adam(discriminator.parameters(), lr=0.0002)
         optimizers = (optimizer_g, optimizer_d)
 
         lr_scheduler_g = torch.optim.lr_scheduler.ReduceLROnPlateau(
@@ -55,10 +55,10 @@ class GanTrainer(NetworkTrainer):
 
         # train generator
         for _ in range(self.iter_g):
-            # generate latent noise vector
-            noise = torch.randn((batch_size, ) + latent_dim).to(self.device)
+            # generate latent noise vector - from standard normal distribution
+            z = torch.randn((batch_size, ) + latent_dim).to(self.device)
 
-            generated = generator(noise)
+            generated = generator(z)
             classified_fake = discriminator(generated)
 
             loss_g = criteria(classified_fake, ones)  # generator wants to make generated images 'valid'
@@ -71,19 +71,16 @@ class GanTrainer(NetworkTrainer):
             else:
                 break  # no need to iterate if not training
 
-        # reuse generated image without affecting the graph for the generator
-        generated = generated.detach()
-
         for _ in range(self.iter_d):
-            noise = torch.randn((batch_size, ) + latent_dim)
+            z = torch.randn((batch_size, ) + latent_dim)
 
             # train discriminator
-            classified_fake = discriminator(generator(noise).detach())
+            classified_fake = discriminator(generator(z).detach())  # detach to prevent generator training
             classified_real = discriminator(imgs)
 
+            # calculate losses
             fake_loss = criteria(classified_fake, zeros)
             real_loss = criteria(classified_real, ones)
-            # loss_d = (real_loss + fake_loss) / 2
             loss_d = real_loss + fake_loss
 
             # update parameters if training
@@ -95,7 +92,7 @@ class GanTrainer(NetworkTrainer):
                 break
 
         # collect outputs and losses
-        output = (generated, classified_fake, classified_real, noise, imgs)
+        output = (generated, classified_fake, classified_real, z, imgs)
         loss = (loss_g, loss_d, fake_loss, real_loss)
 
         if train_stage == TrainStage.TRAIN:
