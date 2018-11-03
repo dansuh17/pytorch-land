@@ -405,27 +405,28 @@ class NetworkTrainer(ABC):
     @staticmethod
     def save_module_summary(writer, module: nn.Module, step: int, save_histogram=False, verbose=False):
         # warning: saving histograms is expensive - both time and space
+        module_name = module.__class__.__name__  # to distinguish among different modules
         with torch.no_grad():
-            for name, parameter in module.named_parameters():
+            for p_name, parameter in module.named_parameters():
                 if parameter.grad is not None:
                     avg_grad = torch.mean(parameter.grad)
                     if verbose:
-                        print('\tavg_grad for {} = {:.6f}'.format(name, avg_grad))
+                        print('\tavg_grad for {}_{} = {:.6f}'.format(p_name, module_name, avg_grad))
                     writer.add_scalar(
-                        'avg_grad/{}'.format(name), avg_grad.item(), step)
+                        'avg_grad/{}_{}'.format(module_name, p_name), avg_grad.item(), step)
                     if save_histogram:
                         writer.add_histogram(
-                            'grad/{}'.format(name), parameter.grad.cpu().numpy(), step)
+                            'grad/{}_{}'.format(module_name, p_name), parameter.grad.cpu().numpy(), step)
 
                 if parameter.data is not None:
                     avg_weight = torch.mean(parameter.data)
                     if verbose:
-                        print('\tavg_weight for {} = {:.6f}'.format(name, avg_weight))
+                        print('\tavg_weight for {}_{} = {:.6f}'.format(module_name, p_name, avg_weight))
                     writer.add_scalar(
-                        'avg_weight/{}'.format(name), avg_weight.item(), step)
+                        'avg_weight/{}_{}'.format(module_name, p_name), avg_weight.item(), step)
                     if save_histogram:
                         writer.add_histogram(
-                            'weight/{}'.format(name), parameter.data.cpu().numpy(), step)
+                            'weight/{}_{}'.format(module_name, p_name), parameter.data.cpu().numpy(), step)
 
     def _to_device(self, data):
         """
