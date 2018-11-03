@@ -35,16 +35,19 @@ class GanTrainer(NetworkTrainer):
             epoch=200, input_size=inputs, lr_scheduler=(lr_scheduler_g, lr_scheduler_d))
 
         self.skip_g_per_epochs = -1
-        self.iter_g = 8
+        self.iter_g = 5  # to catch up discriminator
         self.iter_d = 1
 
     def run_step(self, model, criteria, optimizer, input_, train_stage):
         # required information
         imgs = input_[0]
         batch_size = imgs.size()[0]
+        # add noise
+        imgs += torch.randn((batch_size, ) + self.input_size[1]).to(self.device)
         latent_dim = self.input_size[0]
-        ones = torch.ones((batch_size, 1)).to(self.device)  # mark valid
-        zeros = torch.zeros((batch_size, 1)).to(self.device)  # mark invalid
+        # label switching - valid is marked 0, invalid is marked 1
+        valid = torch.zeros((batch_size, 1)).to(self.device)  # mark valid
+        invalid = torch.ones((batch_size, 1)).to(self.device)  # mark invalid
 
         generator, discriminator = model
         optimizer_g, optimizer_d = optimizer
@@ -61,7 +64,7 @@ class GanTrainer(NetworkTrainer):
             generated = generator(z)
             classified_fake = discriminator(generated)
 
-            loss_g = criteria(classified_fake, ones)  # generator wants to make generated images 'valid'
+            loss_g = criteria(classified_fake, valid)  # generator wants to make generated images 'valid'
 
             # update parameters if training
             if train_stage == TrainStage.TRAIN and self.epoch > self.skip_g_per_epochs:
@@ -79,8 +82,8 @@ class GanTrainer(NetworkTrainer):
             classified_real = discriminator(imgs)
 
             # calculate losses
-            fake_loss = criteria(classified_fake, zeros)
-            real_loss = criteria(classified_real, ones)
+            fake_loss = criteria(classified_fake, invalid)
+            real_loss = criteria(classified_real, valid)
             loss_d = real_loss + fake_loss
 
             # update parameters if training
