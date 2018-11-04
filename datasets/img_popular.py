@@ -40,7 +40,7 @@ class MNISTLoaderMaker(DataLoaderMaker):
             train=True, download=True,
             transform=mnist_transform)
         # create test dataset
-        self.test_dataset = datasets.CIFAR10(
+        self.test_dataset = datasets.MNIST(
             root=train_img_dir,
             train=False, download=True,
             transform=mnist_transform)

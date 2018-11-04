@@ -22,7 +22,7 @@ class Generator(nn.Module):
             nn.BatchNorm1d(1024),
             nn.LeakyReLU(0.2, inplace=True),
             nn.Linear(1024, self.numel),
-            nn.Tanh(),
+            nn.Tanh(),  # MNIST has values between 0 and 1
         )
 
         self.apply(self.init_weights)
@@ -35,7 +35,7 @@ class Generator(nn.Module):
     @staticmethod
     def init_weights(m):
         if isinstance(m, nn.Linear):
-            nn.init.kaiming_uniform_(m.weight)
+            nn.init.kaiming_normal_(m.weight)
             nn.init.constant_(m.bias, 0)
 
 
@@ -43,12 +43,15 @@ class Discriminator(nn.Module):
     def __init__(self, img_size: tuple):
         super().__init__()
         numel = reduce(lambda x, y: x * y, img_size)
+        print('Size of input image for discriminator : ' + numel)
         self.net = nn.Sequential(
-            nn.Linear(in_features=numel, out_features=512),
+            nn.Linear(in_features=numel, out_features=256),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Linear(512, 256),
+            nn.Linear(256, 512),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Linear(256, 1),
+            nn.Linear(512, 1024),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Linear(1024, 1),
             nn.Sigmoid(),
         )
 
@@ -61,7 +64,7 @@ class Discriminator(nn.Module):
     @staticmethod
     def init_weights(m):
         if isinstance(m, nn.Linear):
-            nn.init.kaiming_uniform_(m.weight)
+            nn.init.kaiming_normal_(m.weight)
             nn.init.constant_(m.bias, 0)
 
 
