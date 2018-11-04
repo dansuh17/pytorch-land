@@ -16,7 +16,8 @@ from .loader_maker import DataLoaderMaker
 
 
 class MNISTLoaderMaker(DataLoaderMaker):
-    def __init__(self, data_root: str, batch_size: int, num_workers=4):
+    """Data loader maker for MNIST dataset."""
+    def __init__(self, data_root: str, batch_size: int, num_workers=4, naive_normalization=False):
         super().__init__()
         self.batch_size = batch_size
         self.num_classes = 10
@@ -24,10 +25,14 @@ class MNISTLoaderMaker(DataLoaderMaker):
 
         train_img_dir = os.path.join(data_root, 'mnist')
 
+        # use different normalizer by option - the latter one uses the sample distribution's statistics
+        normalizer = transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)) \
+            if naive_normalization else transforms.Normalize((0.1307, ), (0.3081, ))
+
         # image transform (normalization)
         mnist_transform = transforms.Compose([
             transforms.ToTensor(),
-            transforms.Normalize((0.1307, ), (0.3081, )),
+            normalizer,
         ])
 
         # create datasets

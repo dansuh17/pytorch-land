@@ -19,7 +19,7 @@ class GanTrainer(NetworkTrainer):
         discriminator = Discriminator(img_size=img_size)
         models = (generator, discriminator)
 
-        loader_maker = MNISTLoaderMaker(data_root='data_in', batch_size=128)
+        loader_maker = MNISTLoaderMaker(data_root='data_in', batch_size=100, naive_normalization=True)
         criterion = nn.BCELoss()  # binary cross entropy loss
 
         optimizer_g = torch.optim.Adam(generator.parameters(), lr=0.0002)
@@ -56,6 +56,26 @@ class GanTrainer(NetworkTrainer):
         assert(self.iter_d > 0)
         assert(self.iter_g > 0)
 
+        # train discriminator
+        for _ in range(self.iter_d):
+            z = torch.randn((batch_size, ) + latent_dim)
+
+            classified_fake = discriminator(generator(z).detach())  # detach to prevent generator training
+            classified_real = discriminator(imgs)
+
+            # calculate losses
+            fake_loss = criteria(classified_fake, invalid)
+            real_loss = criteria(classified_real, valid)
+            loss_d = real_loss + fake_loss
+
+            # update parameters if training
+            if train_stage == TrainStage.TRAIN:
+                optimizer_d.zero_grad()
+                loss_d.backward()
+                optimizer_d.step()
+            else:
+                break
+
         # train generator
         for _ in range(self.iter_g):
             # generate latent noise vector - from standard normal distribution
@@ -73,26 +93,6 @@ class GanTrainer(NetworkTrainer):
                 optimizer_g.step()
             else:
                 break  # no need to iterate if not training
-
-        for _ in range(self.iter_d):
-            z = torch.randn((batch_size, ) + latent_dim)
-
-            # train discriminator
-            classified_fake = discriminator(generator(z).detach())  # detach to prevent generator training
-            classified_real = discriminator(imgs)
-
-            # calculate losses
-            fake_loss = criteria(classified_fake, invalid)
-            real_loss = criteria(classified_real, valid)
-            loss_d = real_loss + fake_loss
-
-            # update parameters if training
-            if train_stage == TrainStage.TRAIN:
-                optimizer_d.zero_grad()
-                loss_d.backward()
-                optimizer_d.step()
-            else:
-                break
 
         # collect outputs and losses
         output = (generated, classified_fake, classified_real, z, imgs)

@@ -43,7 +43,6 @@ class Discriminator(nn.Module):
     def __init__(self, img_size: tuple):
         super().__init__()
         numel = reduce(lambda x, y: x * y, img_size)
-        print('Size of input image for discriminator : ' + numel)
         self.net = nn.Sequential(
             nn.Linear(in_features=numel, out_features=256),
             nn.LeakyReLU(0.2, inplace=True),
