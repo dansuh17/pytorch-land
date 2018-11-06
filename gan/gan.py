@@ -22,7 +22,7 @@ class Generator(nn.Module):
             nn.BatchNorm1d(1024),
             nn.LeakyReLU(0.2, inplace=True),
             nn.Linear(1024, self.numel),
-            nn.Tanh(),  # MNIST has values between 0 and 1
+            nn.Tanh(),
         )
 
         self.apply(self.init_weights)

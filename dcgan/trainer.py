@@ -2,28 +2,38 @@ import torch
 from torch import nn
 import torchvision
 
-from datasets.img_popular import MNISTLoaderMaker
+from datasets.img_popular import LSUNLoaderMaker
 from base_trainer import NetworkTrainer, TrainStage
-from .gan import Generator, Discriminator
+from .dcgan import DCGANDiscriminator, DCGANGenerator
 
 
-class GanTrainer(NetworkTrainer):
-    def __init__(self):
-        input_dim = 100
-        g_input = (input_dim, )
-        self.height = 28
-        self.width = 28
+class DCGANTrainer(NetworkTrainer):
+    """Trainer for DCGAN"""
+    def __init__(self, config: dict):
+        print('Configuration: ')
+        print(config)
+        latent_dim = config['latent_dim']
+        g_input = (latent_dim, )
+        self.height = config['height']
+        self.width = config['weight']
         img_size = (1, self.height, self.width)
         inputs = (g_input, img_size)
-        generator = Generator(input_dim=input_dim, img_size=img_size)
-        discriminator = Discriminator(img_size=img_size)
+        self.display_imgs = config['display_imgs']
+        self.batch_size = config['batch_size']
+        self.lr_init = config['lr_init']
+        self.epoch = config['epoch']
+
+        # create models
+        generator = DCGANGenerator(input_dim=latent_dim)
+        discriminator = DCGANDiscriminator()
         models = (generator, discriminator)
 
-        loader_maker = MNISTLoaderMaker(data_root='data_in', batch_size=100, naive_normalization=True)
+        # set data loader maker
+        loader_maker = LSUNLoaderMaker(data_root='data_in', batch_size=self.batch_size)
         criterion = nn.BCELoss()  # binary cross entropy loss
 
-        optimizer_g = torch.optim.Adam(generator.parameters(), lr=0.0002)
-        optimizer_d = torch.optim.Adam(discriminator.parameters(), lr=0.0002)
+        optimizer_g = torch.optim.Adam(generator.parameters(), lr=self.lr_init, betas=(0.5, 0.999))
+        optimizer_d = torch.optim.Adam(discriminator.parameters(), lr=self.lr_init, betas=(0.5, 0.999))
         optimizers = (optimizer_g, optimizer_d)
 
         # TODO: validate the effects of schedulers
@@ -31,9 +41,11 @@ class GanTrainer(NetworkTrainer):
             optimizer_g, mode='min', verbose=True, factor=0.9, patience=10)
         lr_scheduler_d = torch.optim.lr_scheduler.ReduceLROnPlateau(
             optimizer_d, mode='min', verbose=True, factor=0.9, patience=10)
+
+        # create this trainer
         super().__init__(
             models, loader_maker, criterion, optimizers,
-            epoch=200, input_size=inputs, lr_scheduler=None)
+            epoch=self.epoch, input_size=inputs, lr_scheduler=None)
 
         self.skip_g_per_epochs = -1
         self.iter_g = 1
@@ -41,10 +53,10 @@ class GanTrainer(NetworkTrainer):
 
     def run_step(self, model, criteria, optimizer, input_, train_stage):
         # required information
-        imgs = input_[0]
-        batch_size = imgs.size()[0]
+        imgs, _ = input_
+        batch_size = imgs.size(0)
+
         # add noise
-        # imgs += torch.randn((batch_size, ) + self.input_size[1]).to(self.device)
         latent_dim = self.input_size[0]
         # TODO: try label switching - valid is marked 0, invalid is marked 1
         valid = torch.ones((batch_size, 1)).to(self.device)  # mark valid
@@ -130,11 +142,15 @@ class GanTrainer(NetworkTrainer):
         }
 
     def pre_epoch_finish(self, input, output, metric_manager, train_stage: TrainStage):
+        """Add example images from validation step just before the end of epoch training."""
         if train_stage == TrainStage.VALIDATE:
             generated_imgs, _, _, _, real_imgs = output
             self.add_generated_image(
-                generated_imgs, nrow=4, height=self.height, width=self.width, name='generated')
-            self.add_generated_image(real_imgs, nrow=4, height=self.height, width=self.width, name='real')
+                generated_imgs, nrow=self.display_imgs, height=self.height,
+                width=self.width, name='generated')
+            self.add_generated_image(
+                real_imgs, nrow=self.display_imgs, height=self.height,
+                width=self.width, name='real')
 
     def add_generated_image(self, imgs, nrow, height, width, name: str):
         grid = torchvision.utils.make_grid(imgs[:nrow, :], nrow=nrow, normalize=True)
@@ -142,6 +158,11 @@ class GanTrainer(NetworkTrainer):
 
 
 if __name__ == '__main__':
-    trainer = GanTrainer()
+    # read configuration file
+    import json
+    with open('config.json', 'r') as configf:
+        config = json.loads(configf.read())
+
+    trainer = DCGANTrainer(config)
     trainer.fit()
     trainer.cleanup()

@@ -1,11 +1,17 @@
+"""
+Implementation of DCGAN by Radford et al. - "Unsupervised Representation Learning with Deep Convolutional Generative Adversarial Networks
+" (2016)
+"""
 import torch
 from torch import nn
 
 
 class DCGANGenerator(nn.Module):
+    """Generator model of DCGAN."""
     def __init__(self, input_dim: int):
         super().__init__()
         # create model with 5 stacks of linear layer
+        # TODO: generalize these magic numbers
         self.net = nn.Sequential(
             nn.ConvTranspose2d(
                 in_channels=input_dim, out_channels=1024, kernel_size=4,
@@ -38,8 +44,10 @@ class DCGANGenerator(nn.Module):
 
 
 class DCGANDiscriminator(nn.Module):
+    """Discriminator model of DCGAN."""
     def __init__(self):
         super().__init__()
+        # TODO: generalize these magic numbers
         self.net = nn.Sequential(
             # input : (3, 64, 64)
             nn.Conv2d(
