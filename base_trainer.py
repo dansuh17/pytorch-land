@@ -187,14 +187,14 @@ class NetworkTrainer(ABC):
         It is given all required instances for training.
 
         Args:
-            model:
-            criteria:
-            optimizer:
-            input_:
-            train_stage:
+            model (nn.Module | tuple[nn.Module]): models to train
+            criteria: model criteria functions
+            optimizer (Optimizer | tuple[Optimizer]): model optimizers
+            input_ (torch.Tensor | tuple[torch.Tensor]): inputs to models
+            train_stage (TrainStage): enum indicating which stage of training it is going through
 
         Returns:
-
+            (output, loss) : any combination of outputs and loss values
         """
         raise NotImplementedError
 
