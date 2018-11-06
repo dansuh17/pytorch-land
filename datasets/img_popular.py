@@ -26,7 +26,9 @@ class MNISTLoaderMaker(DataLoaderMaker):
         train_img_dir = os.path.join(data_root, 'mnist')
 
         # use different normalizer by option - the latter one uses the sample distribution's statistics
-        normalizer = transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)) \
+        # Be CAREFUL of sample distribution based normalization!!
+        # the values will not be within boundaries of [-1, 1]
+        normalizer = transforms.Normalize(mean=(0.5, ), std=(0.5, )) \
             if naive_normalization else transforms.Normalize((0.1307, ), (0.3081, ))
 
         # image transform (normalization)
@@ -90,6 +92,67 @@ class MNISTLoaderMaker(DataLoaderMaker):
             batch_size=self.batch_size,
         )
         return test_dataloader
+
+
+class LSUNLoaderMaker(DataLoaderMaker):
+    """DataLoader maker for LSUN (Large-scale scene understanding) dataset."""
+    def __init__(self, data_root: str, batch_size: int, num_workers=4):
+        super().__init__()
+        self.batch_size = batch_size
+        self.num_workers = num_workers
+
+        img_dir = os.path.join(data_root, 'lsun')
+
+        # image transform (normalization)
+        lsun_transform = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))
+        ])
+
+        # create datasets
+        self.train_dataset = datasets.LSUN(
+            root=img_dir,
+            classes=['bedroom_train'],  # TODO: allow other classes
+            transform=lsun_transform)
+        self.validate_dataset = datasets.LSUN(
+            root=img_dir,
+            classes=['bedroom_val'],
+            transform=lsun_transform)
+        # create test dataset
+        self.test_dataset = datasets.LSUN(
+            root=img_dir,
+            classes=['bedroom_test'],
+            transform=lsun_transform)
+
+    def make_train_dataloader(self):
+        return data.DataLoader(
+            self.train_dataset,
+            pin_memory=True,
+            drop_last=True,
+            shuffle=True,
+            num_workers=self.num_workers,
+            batch_size=self.batch_size,
+        )
+
+    def make_validate_dataloader(self):
+        return data.DataLoader(
+            self.validate_dataset,
+            pin_memory=True,
+            drop_last=True,
+            shuffle=True,
+            num_workers=self.num_workers,
+            batch_size=self.batch_size,
+        )
+
+    def make_test_dataloader(self):
+        return data.DataLoader(
+            self.test_dataset,
+            pin_memory=True,
+            drop_last=True,
+            shuffle=True,
+            num_workers=self.num_workers,
+            batch_size=self.batch_size,
+        )
 
 
 # deprecated function
