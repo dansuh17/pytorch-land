@@ -15,7 +15,7 @@ class DCGANTrainer(NetworkTrainer):
         latent_dim = config['latent_dim']
         g_input = (latent_dim, )
         self.height = config['height']
-        self.width = config['weight']
+        self.width = config['width']
         img_size = (1, self.height, self.width)
         inputs = (g_input, img_size)
         self.display_imgs = config['display_imgs']
