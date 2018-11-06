@@ -99,9 +99,6 @@ class GanTrainer(NetworkTrainer):
         output = (generated, classified_fake, classified_real, z, imgs)
         loss = (loss_g, loss_d, fake_loss, real_loss)
 
-        if train_stage == TrainStage.TRAIN:
-            self.train_step += 1
-
         return output, loss
 
     @property

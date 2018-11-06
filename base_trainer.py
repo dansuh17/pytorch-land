@@ -181,7 +181,21 @@ class NetworkTrainer(ABC):
         print('Training complete.')
 
     @abstractmethod
-    def run_step(self, model, criteria, optimizer, input_, train_stage: TrainStage):
+    def run_step(self, model, criteria, optimizer, input_, train_stage: TrainStage, *args, **kwargs):
+        """
+        Run a single step.
+        It is given all required instances for training.
+
+        Args:
+            model:
+            criteria:
+            optimizer:
+            input_:
+            train_stage:
+
+        Returns:
+
+        """
         raise NotImplementedError
 
     def run_epoch(self, dataloader, train_stage: TrainStage):
@@ -192,6 +206,7 @@ class NetworkTrainer(ABC):
         for step, input_ in enumerate(dataloader):
             input_ = self._to_device(self.input_transform(input_))  # transform dataloader's data
 
+            # run a single step
             output, loss = self.run_step(
                 self.model, self.criterion, self.optimizer, input_, train_stage)
 
@@ -199,7 +214,11 @@ class NetworkTrainer(ABC):
             metric = self.make_performance_metric(input_, output, loss)
             metric_manager.append_metric(metric)
 
+            # perform any action required after running the step
             self.post_step(input_, output, metric, train_stage=train_stage)
+
+            if train_stage == TrainStage.TRAIN:
+                self.train_step += 1
 
             # run pre-epoch-finish after the final step
             if step == dataloader_size - 1:

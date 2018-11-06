@@ -7,7 +7,7 @@ import torch.optim as optim
 import torchvision
 from .schmidt_sda import SchmidtSDA
 from .dae_unet import DansuhDenoisingCNN
-from base_trainer import NetworkTrainer
+from base_trainer import NetworkTrainer, TrainStage
 
 
 class DansuhNetTrainer(NetworkTrainer):
@@ -22,14 +22,12 @@ class DansuhNetTrainer(NetworkTrainer):
         input_data_dir = config['data_dir']
 
         model = DansuhDenoisingCNN()
-
         dataloader_maker = VCTKLoaderMaker(input_data_dir, batch_size, use_channel=True)
         criterion = nn.MSELoss(size_average=True)
         optimizer = optim.Adam(params=model.parameters(),
                                lr=self.lr_init)
         lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(
             optimizer, mode='min', verbose=True, factor=0.2, patience=7)
-
         # initialize the trainer
         super().__init__(model, dataloader_maker, criterion, optimizer,
                          epoch=config['epoch'],
@@ -37,8 +35,17 @@ class DansuhNetTrainer(NetworkTrainer):
                          num_devices=config['num_devices'],
                          lr_scheduler=lr_scheduler)
 
-    def forward(self, model, input, *args, **kwargs):
-        return model(input[1])  # feed noisy image to the model
+    def run_step(self, model, criteria, optimizer, input_, train_stage: TrainStage, *args, **kwargs):
+        clean_img, noisy_img = input_
+        output = model(noisy_img)
+        loss = criteria(output, clean_img)
+
+        # update the model if training
+        if train_stage == TrainStage.TRAIN:
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+        return output, loss
 
     @staticmethod
     def input_transform(data):
@@ -46,17 +53,11 @@ class DansuhNetTrainer(NetworkTrainer):
         noisy_img = data[1].float()
         return clean_img, noisy_img
 
-    @staticmethod
-    def criterion_input_maker(input, output, *args, **kwargs):
-        output_img = output  # latent vector not used
-        clean_img, _ = input
-        return output_img, clean_img
-
     def pre_epoch_finish(self, input, output, metric_manager, train_stage):
         super().pre_epoch_finish(input, output, metric_manager, train_stage)
         # expand variables just to read easily
         clean_imgs, noisy_imgs = input
-        nrow = 4
+        nrow = 6
         self.add_image(clean_imgs, nrow, height=self.input_height, width=self.input_width, name='clean')
         self.add_image(noisy_imgs, nrow, height=self.input_height, width=self.input_width, name='noisy')
         self.add_image(output, nrow, height=self.input_height, width=self.input_width, name='denoised')
