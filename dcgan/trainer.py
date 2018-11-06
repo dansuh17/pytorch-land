@@ -160,7 +160,7 @@ class DCGANTrainer(NetworkTrainer):
 if __name__ == '__main__':
     # read configuration file
     import json
-    with open('config.json', 'r') as configf:
+    with open('dcgan/config.json', 'r') as configf:
         config = json.loads(configf.read())
 
     trainer = DCGANTrainer(config)
