@@ -118,18 +118,26 @@ class LSUNLoaderMaker(DataLoaderMaker):
             root=img_dir,
             classes=['bedroom_val'],
             transform=lsun_transform)
-        # create test dataset
+        # create test dataset - this will share the training dataset
         self.test_dataset = datasets.LSUN(
             root=img_dir,
-            classes=['bedroom_test'],
+            classes=['bedroom_train'],
             transform=lsun_transform)
+
+        # split indices btwn. train and validation sets
+        num_data = len(self.train_dataset)
+        indices = list(range(num_data))
+        random.shuffle(indices)
+        num_train = math.floor(num_data * 0.95)
+        self.train_idx, self.test_idx = \
+            indices[:num_train], indices[num_train:]
 
     def make_train_dataloader(self):
         return data.DataLoader(
             self.train_dataset,
+            sampler=data.sampler.SubsetRandomSampler(self.train_idx),
             pin_memory=True,
             drop_last=True,
-            shuffle=True,
             num_workers=self.num_workers,
             batch_size=self.batch_size,
         )
@@ -147,9 +155,9 @@ class LSUNLoaderMaker(DataLoaderMaker):
     def make_test_dataloader(self):
         return data.DataLoader(
             self.test_dataset,
+            sampler=data.sampler.SubsetRandomSampler(self.test_idx),
             pin_memory=True,
             drop_last=True,
-            shuffle=True,
             num_workers=self.num_workers,
             batch_size=self.batch_size,
         )
