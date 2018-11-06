@@ -100,11 +100,14 @@ class LSUNLoaderMaker(DataLoaderMaker):
         super().__init__()
         self.batch_size = batch_size
         self.num_workers = num_workers
+        self.img_dim = 64  # default to 64 x 64
 
         img_dir = os.path.join(data_root, 'lsun')
 
         # image transform (normalization)
         lsun_transform = transforms.Compose([
+            transforms.Resize(self.img_dim),
+            transforms.CenterCrop(self.img_dim),
             transforms.ToTensor(),
             transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))
         ])
