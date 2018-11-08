@@ -71,7 +71,8 @@ class DCGANTrainer(NetworkTrainer):
 
         # train discriminator
         for _ in range(self.iter_d):
-            z = torch.randn((batch_size, ) + latent_dim)
+            # create 4D noise vector : (b x latent_dim x 1 x 1)
+            z = torch.randn((batch_size, ) + latent_dim + (1, 1))
 
             classified_fake = discriminator(generator(z).detach())  # detach to prevent generator training
             classified_real = discriminator(imgs)
