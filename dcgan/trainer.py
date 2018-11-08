@@ -58,6 +58,8 @@ class DCGANTrainer(NetworkTrainer):
 
         # add noise
         latent_dim = self.input_size[0]
+        # 4D noise vector : (b x latent_dim x 1 x 1)
+        noise_size = (batch_size, ) + latent_dim + (1, 1)
         # TODO: try label switching - valid is marked 0, invalid is marked 1
         valid = torch.ones((batch_size, 1)).to(self.device)  # mark valid
         invalid = torch.zeros((batch_size, 1)).to(self.device)  # mark invalid
@@ -71,8 +73,7 @@ class DCGANTrainer(NetworkTrainer):
 
         # train discriminator
         for _ in range(self.iter_d):
-            # create 4D noise vector : (b x latent_dim x 1 x 1)
-            z = torch.randn((batch_size, ) + latent_dim + (1, 1))
+            z = torch.randn(noise_size)
 
             classified_fake = discriminator(generator(z).detach())  # detach to prevent generator training
             classified_real = discriminator(imgs)
@@ -93,7 +94,7 @@ class DCGANTrainer(NetworkTrainer):
         # train generator
         for _ in range(self.iter_g):
             # generate latent noise vector - from standard normal distribution
-            z = torch.randn((batch_size, ) + latent_dim).to(self.device)
+            z = torch.randn(noise_size)
 
             generated = generator(z)
             classified_fake = discriminator(generated)

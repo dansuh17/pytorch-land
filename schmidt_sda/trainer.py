@@ -23,7 +23,7 @@ class DansuhNetTrainer(NetworkTrainer):
 
         model = DansuhDenoisingCNN()
         dataloader_maker = VCTKLoaderMaker(input_data_dir, batch_size, use_channel=True)
-        criterion = nn.MSELoss(size_average=True)
+        criterion = nn.MSELoss(reduction='elementwise_mean')
         optimizer = optim.Adam(params=model.parameters(),
                                lr=self.lr_init)
         lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(
