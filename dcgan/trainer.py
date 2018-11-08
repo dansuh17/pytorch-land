@@ -51,7 +51,7 @@ class DCGANTrainer(NetworkTrainer):
         self.iter_g = 1
         self.iter_d = 1
 
-    def run_step(self, model, criteria, optimizer, input_, train_stage):
+    def run_step(self, model, criteria, optimizer, input_, train_stage, *args, **kwargs):
         # required information
         imgs, _ = input_
         batch_size = imgs.size(0)

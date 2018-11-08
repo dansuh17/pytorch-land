@@ -93,7 +93,7 @@ class NetworkTrainer(ABC):
             optimizer (Optimizer | tuple[Optimizer]): gradient descent optimizer
             epoch: total epochs to train (the end epoch)
             input_size (tuple[int]|tuple[tuple[int]]): size of inputs
-                - must match the number of models provided
+                - MUST match the number of models provided
             output_dir (str): root output directory
             num_devices (int): number of GPU devices to split the batch
             seed (int): random seed to use
@@ -326,7 +326,7 @@ class NetworkTrainer(ABC):
         if isinstance(obj, tuple):
             return obj
         else:
-            return obj,
+            return obj,  # make tuple
 
     def _save_best_model(self, model, prev_best_metric, curr_metric, comparison=operator.lt):
         if prev_best_metric is None:
@@ -334,7 +334,7 @@ class NetworkTrainer(ABC):
 
         # make tuples so that it is easier to iterate
         model = self._make_tuple(model)
-        input_size = self._make_tuple(self.input_size)
+        input_size = self.input_size
         standard_metric = self._make_tuple(self.standard_metric)
 
         # match the length
@@ -359,7 +359,7 @@ class NetworkTrainer(ABC):
 
     def _save_all_modules(self):
         models = self._make_tuple(self.model)
-        input_sizes = self._make_tuple(self.input_size)
+        input_sizes = self.input_size
 
         for m, input_sz in zip(models, input_sizes):
             self._save_module(m.module, input_sz)
@@ -369,9 +369,9 @@ class NetworkTrainer(ABC):
         Saves a single module.
 
         Args:
-            module:
-            input_size:
-            save_onnx:
+            module (nn.Module):
+            input_size (tuple): input dimensions
+            save_onnx (bool):
             prefix:
 
         Returns:
@@ -416,7 +416,7 @@ class NetworkTrainer(ABC):
 
     def _save_module_summary_all(self, **kwargs):
         models = self._make_tuple(self.model)
-        input_sizes = self._make_tuple(self.input_size)
+        input_sizes = self.input_size
 
         for m, input_sz in zip(models, input_sizes):
             self.save_module_summary(self.writer, m.module, self.train_step, **kwargs)
