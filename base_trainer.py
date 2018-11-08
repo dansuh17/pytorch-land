@@ -102,6 +102,7 @@ class NetworkTrainer(ABC):
         # initial settings
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+        # set seed
         if seed is None:
             self.seed = torch.initial_seed()
         else:
@@ -112,13 +113,22 @@ class NetworkTrainer(ABC):
         # training devices to use
         self.device_ids = list(range(num_devices))
 
+        # PREPARE FIELD MODULES
+        # all fields that can have multiple instances are managed using tuples
+        # - this is easier to manage from within
         # prepare model(s) for training
         if isinstance(model, tuple):  # in case of having multiple models
             self.model_name = '_'.join(map(lambda x: x.__class__.__name__, model))
-            self.model = tuple(map(self._register_model, model))
+            self.models = tuple(map(self._register_model, model))
         else:
             self.model_name = model.__class__.__name__
-            self.model = self._register_model(model)
+            self.models = (self._register_model(model), )
+
+        # self.input_sizes is tuple of tuples or torch.Size()s
+        if len(self.models) == 1:
+            self.input_sizes = (input_size, )
+        # input sizes and models should have equal lengths - input sizes assigned per models!
+        assert len(self.input_sizes) == len(self.models)
 
         # setup and create output directories
         self.output_dir = output_dir
@@ -133,16 +143,47 @@ class NetworkTrainer(ABC):
         self.test_dataloader = dataloader_maker.make_test_dataloader()
 
         # save any other states or variables to maintain
-        self.input_size = input_size  # must be torch.Size or tuple, or a tuple of them
         self.total_epoch = epoch
-        self.criterion = criterion
-        self.optimizer = optimizer
-        self.lr_scheduler = lr_scheduler
+        self.criterions = self._make_tuple(criterion)
+        self.optimizers = self._make_tuple(optimizer)
+        if lr_scheduler is not None:
+            self.lr_schedulers = self._make_tuple(lr_scheduler)
+        else:
+            self.lr_schedulers = None
         self.writer = SummaryWriter(log_dir=self.log_dir)
 
         # initialize training process
         self.epoch = 0
         self.train_step = 0
+
+    @staticmethod
+    def _make_tuple(obj):
+        """
+        Make an object to tuple instance.
+        If the object is already a tuple, it returns itself.
+
+        Args:
+            obj: object instance to turn into tuple
+
+        Returns:
+            tuple object
+        """
+        if isinstance(obj, tuple):
+            return obj
+        if isinstance(obj, list):
+            return tuple(obj)  # make lists to tuple as well
+        else:
+            return (obj, )
+
+    @staticmethod
+    def _make_single_or_tuple(tuple_inst: tuple):
+        if not isinstance(tuple_inst, tuple):
+            raise ValueError("Input tuple_inst should be an instance of tuple!")
+
+        if len(tuple_inst) > 1:
+            return tuple_inst
+        else:
+            return tuple_inst[0]
 
     @property
     def standard_metric(self):
@@ -162,17 +203,14 @@ class NetworkTrainer(ABC):
 
             train_metrics = self.train()
             # compare the train metric and save the best model - TODO: should I use the validation metric?
-            best_metric = self._save_best_model(self.model, best_metric, train_metrics)
+            best_metric = self._save_best_model(self.models, best_metric, train_metrics)
 
             # run upon validation set
             val_metrics = self.validate()
 
             # update learning rate based on validation metric
-            if self.lr_scheduler is not None:
-                lr_scheduler = self._make_tuple(self.lr_scheduler)
-                metrics = self._make_tuple(self.standard_metric)
-
-                for idx, lrs in enumerate(lr_scheduler):
+            if self.lr_schedulers is not None:
+                for idx, lrs in enumerate(self.lr_schedulers):
                     lrs.step(val_metrics.mean(self.standard_metric))
 
             self.epoch += 1
@@ -198,7 +236,17 @@ class NetworkTrainer(ABC):
         """
         raise NotImplementedError
 
-    def run_epoch(self, dataloader, train_stage: TrainStage):
+    def _run_epoch(self, dataloader, train_stage: TrainStage):
+        """
+        Runs an epoch for a dataset.
+
+        Args:
+            dataloader (torch.utils.data.DataLoader): data loader to use in this epoch
+            train_stage (TrainStage): enum indicating which training step this epoch is running
+
+        Returns:
+            metric_manager: a set of important metrics managed by the manager
+        """
         self.before_epoch(train_stage=train_stage)
 
         metric_manager = MetricManager()  # initialize the metric manager
@@ -207,8 +255,14 @@ class NetworkTrainer(ABC):
             input_ = self._to_device(self.input_transform(input_))  # transform dataloader's data
 
             # run a single step
+            # this step is exposed to public for custom implementation
+            # the parameters passed should have equal form as passed into the constructor
             output, loss = self.run_step(
-                self.model, self.criterion, self.optimizer, input_, train_stage)
+                self._make_single_or_tuple(self.models),
+                self._make_single_or_tuple(self.criterions),
+                self._make_single_or_tuple(self.optimizers),
+                input_,
+                train_stage)
 
             # metric calculation
             metric = self.make_performance_metric(input_, output, loss)
@@ -217,6 +271,7 @@ class NetworkTrainer(ABC):
             # perform any action required after running the step
             self.post_step(input_, output, metric, train_stage=train_stage)
 
+            # update train step if training
             if train_stage == TrainStage.TRAIN:
                 self.train_step += 1
 
@@ -227,16 +282,16 @@ class NetworkTrainer(ABC):
         return metric_manager
 
     def test(self):
-        return self.run_epoch(self.test_dataloader, TrainStage.TEST)
+        return self._run_epoch(self.test_dataloader, TrainStage.TEST)
 
     def train(self):
         # train (model update)
-        return self.run_epoch(self.train_dataloader, TrainStage.TRAIN)
+        return self._run_epoch(self.train_dataloader, TrainStage.TRAIN)
 
     def validate(self):
-        return self.run_epoch(self.val_dataloader, TrainStage.VALIDATE)
+        return self._run_epoch(self.val_dataloader, TrainStage.VALIDATE)
 
-    def _register_model(self, model):
+    def _register_model(self, model: nn.Module):
         return torch.nn.parallel.DataParallel(
             model.to(self.device), device_ids=self.device_ids)
 
@@ -248,7 +303,7 @@ class NetworkTrainer(ABC):
         # store the epoch number (to look good in tensorboard), and learning rate
         if train_stage == TrainStage.TRAIN:
             self.writer.add_scalar('epoch', self.epoch, self.train_step)
-            self.save_learning_rate(self.writer, self.optimizer, self.train_step)
+            self.save_learning_rate(self.writer, self.optimizers, self.train_step)
 
     def post_step(self, input, output, metric: dict, train_stage: TrainStage):
         if train_stage == TrainStage.TRAIN:
@@ -280,27 +335,26 @@ class NetworkTrainer(ABC):
         The checkpoint saves the state dictionary of various modules
         required for training. Usually this information is used to resume training.
         """
-        if isinstance(self.model, tuple):
-            model_state = tuple(map(lambda m: m.module.state_dict(), self.model))
-        else:
-            model_state = self.model.module.state_dict()
-
-        if isinstance(self.optimizer, tuple):
-            optimizer_state = tuple(map(lambda m: m.state_dict(), self.optimizer))
-        else:
-            optimizer_state = self.optimizer.state_dict()
+        model_state = tuple(map(lambda m: m.module.state_dict(), self.models))
+        optimizer_state = tuple(map(lambda m: m.state_dict(), self.optimizers))
 
         train_state = {
             'epoch': self.epoch,
             'step': self.train_step,
             'seed': self.seed,
-            'model': model_state,
-            'optimizer': optimizer_state,
+            'models': model_state,  # tuple of states (even for len == 1)
+            'optimizers': optimizer_state,  # tuple of states
         }
         cptf = '{}{}_checkpoint_e{}.pth'.format(prefix, self.model_name, self.epoch)
         torch.save(train_state, os.path.join(self.checkpoint_dir, cptf))
 
     def resume(self, filename: str):
+        """
+        Load checkpoint file and set internal fields accordingly.
+
+        Args:
+            filename (str): file path to checkpoint file
+        """
         cpt = torch.load(filename)
         self.seed = cpt['seed']
         torch.manual_seed(self.seed)
@@ -308,8 +362,10 @@ class NetworkTrainer(ABC):
         self.train_step = cpt['step']
 
         # load the model and optimizer  # TODO: consider when they are tuples
-        self.model = self.model.load_state_dict(cpt['model'])
-        self.optimizer = self.optimizer.load_state_dict(cpt['optimizer'])
+        self.models = [m.load_state_dict(state_dict)
+                       for m, state_dict in zip(self.models, cpt['models'])]
+        self.optimizers = [o.load_state_dict(state_dict)
+                           for o, state_dict in zip(self.optimizers, cpt['optimizers'])]
 
     def cleanup(self):
         self.writer.close()
@@ -321,28 +377,17 @@ class NetworkTrainer(ABC):
         """
         return data
 
-    @staticmethod
-    def _make_tuple(obj):
-        if isinstance(obj, tuple):
-            return obj
-        else:
-            return obj,  # make tuple
-
-    def _save_best_model(self, model, prev_best_metric, curr_metric, comparison=operator.lt):
+    def _save_best_model(self, models: tuple, prev_best_metric, curr_metric, comparison=operator.lt):
         if prev_best_metric is None:
             return curr_metric
 
-        # make tuples so that it is easier to iterate
-        model = self._make_tuple(model)
-        input_size = self.input_size
         standard_metric = self._make_tuple(self.standard_metric)
-
         # match the length
-        if len(standard_metric) == 1 and len(model) != 1:
-            standard_metric *= len(model)
+        if len(standard_metric) == 1 and len(models) != 1:
+            standard_metric *= len(models)
 
         best_metric = prev_best_metric
-        for m, std_metric, input_sz in zip(model, standard_metric, input_size):
+        for m, input_sz, std_metric in zip(models, self.input_sizes, standard_metric):
             # compare the standard metric, and if the standard performance metric
             # is better, then save the best model
             if comparison(
@@ -358,10 +403,7 @@ class NetworkTrainer(ABC):
         return best_metric
 
     def _save_all_modules(self):
-        models = self._make_tuple(self.model)
-        input_sizes = self.input_size
-
-        for m, input_sz in zip(models, input_sizes):
+        for m, input_sz in zip(self.models, self.input_sizes):
             self._save_module(m.module, input_sz)
 
     def _save_module(self, module, input_size: tuple, save_onnx=False, prefix=''):
@@ -405,20 +447,14 @@ class NetworkTrainer(ABC):
         print(log)
 
     @staticmethod
-    def save_learning_rate(writer, optimizer, step: int):
-        if not isinstance(optimizer, tuple):
-            optimizer = (optimizer, )
-
-        for opt in optimizer:
+    def save_learning_rate(writer, optimizers, step: int):
+        for opt in optimizers:
             for idx, param_group in enumerate(opt.param_groups):
                 lr = param_group['lr']
                 writer.add_scalar('lr/{}'.format(idx), lr, step)
 
     def _save_module_summary_all(self, **kwargs):
-        models = self._make_tuple(self.model)
-        input_sizes = self.input_size
-
-        for m, input_sz in zip(models, input_sizes):
+        for m, input_sz in zip(self.models, self.input_sizes):
             self.save_module_summary(self.writer, m.module, self.train_step, **kwargs)
 
     @staticmethod
@@ -462,96 +498,3 @@ class NetworkTrainer(ABC):
         elif isinstance(data, list):
             return [d.to(self.device) for d in data]
         return data.to(self.device)
-
-
-#### DEPRECATED ####
-class NetworkTrainerOld:
-    """Base trainer for neural net training.
-
-    This provides a minimal set of methods that any trainer
-    should implement.
-    """
-
-    def __init__(self):
-        print('THIS CLASS (NetworkTrainerOld) is DEPRECATED. USE NetworkTrainer INSTEAD.')
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self.seed = torch.initial_seed()
-        print('Using random seed : {}'.format(self.seed))
-
-    def test(self):
-        raise NotImplementedError
-
-    def train(self):
-        raise NotImplementedError
-
-    def validate(self):
-        raise NotImplementedError
-
-    def save_checkpoint(self, filename: str):
-        raise NotImplementedError
-
-    def cleanup(self):
-        raise NotImplementedError
-
-    @staticmethod
-    def save_module(module: nn.Module, path: str, save_onnx=False, dummy_input=None):
-        if isinstance(module, nn.parallel.DataParallel):
-            raise TypeError('Cannot save module wrapped with DataParallel!')
-        if save_onnx:
-            if dummy_input is None:
-                raise ValueError('Must provide a valid dummy input.')
-            import onnx
-            # TODO: input / output names?
-            # warning: cannot export DataParallel-wrapped module
-            torch.onnx.export(module, dummy_input, path, verbose=True)
-            # check validity of onnx IR and print the graph
-            model = onnx.load(path)
-            onnx.checker.check_model(model)
-            onnx.helper.printable_graph(model.graph)
-        else:
-            torch.save(module, path)
-
-    @staticmethod
-    def performance_metric(*args, **kwargs):
-        """Returns a dictionary containing various performance metrics."""
-        raise NotImplementedError
-
-    @staticmethod
-    def log_performance(writer, metrics: dict, epoch: int, step: int, summary_group='train'):
-        log = 'Epoch ({}): {}\tstep: {}\t'.format(summary_group, epoch, step)
-        for metric_name, val in metrics.items():
-            log += '{}: {:.06f}\t'.format(metric_name, val)
-            # write to summary writer
-            writer.add_scalar('{}/{}'.format(summary_group, metric_name), val, step)
-        print(log)
-
-    @staticmethod
-    def save_learning_rate(writer, optimizer, step: int):
-        for idx, param_group in enumerate(optimizer.param_groups):
-            lr = param_group['lr']
-            writer.add_scalar('lr/{}'.format(idx), lr, step)
-
-    @staticmethod
-    def save_module_summary(writer, module: nn.Module, step: int, save_histogram=False, verbose=False):
-        # warning: saving histograms is expensive - both time and space
-        with torch.no_grad():
-            for name, parameter in module.named_parameters():
-                if parameter.grad is not None:
-                    avg_grad = torch.mean(parameter.grad)
-                    if verbose:
-                        print('\tavg_grad for {} = {:.6f}'.format(name, avg_grad))
-                    writer.add_scalar(
-                        'avg_grad/{}'.format(name), avg_grad.item(), step)
-                    if save_histogram:
-                        writer.add_histogram(
-                            'grad/{}'.format(name), parameter.grad.cpu().numpy(), step)
-
-                if parameter.data is not None:
-                    avg_weight = torch.mean(parameter.data)
-                    if verbose:
-                        print('\tavg_weight for {} = {:.6f}'.format(name, avg_weight))
-                    writer.add_scalar(
-                        'avg_weight/{}'.format(name), avg_weight.item(), step)
-                    if save_histogram:
-                        writer.add_histogram(
-                            'weight/{}'.format(name), parameter.data.cpu().numpy(), step)

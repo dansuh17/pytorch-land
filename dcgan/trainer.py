@@ -57,7 +57,7 @@ class DCGANTrainer(NetworkTrainer):
         batch_size = imgs.size(0)
 
         # add noise
-        latent_dim = self.input_size[0]
+        latent_dim = self.input_sizes[0]
         # 4D noise vector : (b x latent_dim x 1 x 1)
         noise_size = (batch_size, ) + latent_dim
         # TODO: try label switching - valid is marked 0, invalid is marked 1
