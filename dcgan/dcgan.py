@@ -74,7 +74,7 @@ class DCGANDiscriminator(nn.Module):
         self.apply(self.init_weights)
 
     def forward(self, x):
-        return self.net(x).view(-1, 1).squeeze(dim=1)
+        return self.net(x).view(-1, 1)
 
     @staticmethod
     def init_weights(m):
