@@ -13,7 +13,7 @@ class DCGANTrainer(NetworkTrainer):
         print('Configuration: ')
         print(config)
         latent_dim = config['latent_dim']
-        g_input = (latent_dim, )
+        g_input = (latent_dim, 1, 1)
         self.height = config['height']
         self.width = config['width']
         img_size = (1, self.height, self.width)
@@ -59,7 +59,7 @@ class DCGANTrainer(NetworkTrainer):
         # add noise
         latent_dim = self.input_size[0]
         # 4D noise vector : (b x latent_dim x 1 x 1)
-        noise_size = (batch_size, ) + latent_dim + (1, 1)
+        noise_size = (batch_size, ) + latent_dim
         # TODO: try label switching - valid is marked 0, invalid is marked 1
         valid = torch.ones((batch_size, 1)).to(self.device)  # mark valid
         invalid = torch.zeros((batch_size, 1)).to(self.device)  # mark invalid
