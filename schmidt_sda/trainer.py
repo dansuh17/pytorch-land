@@ -49,7 +49,7 @@ class DansuhNetTrainer(NetworkTrainer):
 
     @staticmethod
     def input_transform(data):
-        clean_img = data[0].float()
+        clean_img = data[0].float()  # these have been read as double tensor
         noisy_img = data[1].float()
         return clean_img, noisy_img
 
