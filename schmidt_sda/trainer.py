@@ -184,11 +184,8 @@ class SchmidtSDATrainer(NetworkTrainer):
 
         # these are normalized db-scale mel-spectrograms
         for mel_spec_db_norm in imgs:
-            # normalized -> denormalized
-            mel_spec_db = denormalize_db_spectrogram(mel_spec_db_norm)
-            # db-scale -> mel-spec
-            mel_spec = librosa.db_to_power(mel_spec_db)
-            # mel-spec -> power-spectrum
+            # normalized -> denormalized db-scale mel-spec
+            mel_spec = librosa.db_to_power(denormalize_db_spectrogram(mel_spec_db_norm))
             spec = np.dot(mel_basis_inv, mel_spec)
             # convert the power spectrum to db for better visualization
             img = librosa.power_to_db(spec, ref=np.max)

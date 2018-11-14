@@ -35,7 +35,7 @@ def denormalize_db_spectrogram(spec, high=20.0, low=-100.0):
     """
     mid = (low + high) / 2.0  # -40
     scale = (high - mid)  # 60
-    return spec * scale - mid
+    return (spec * scale) + mid
 
 
 def normalize_db_spectrogram(db_spec, high=20.0, low=-100.0):
@@ -53,7 +53,7 @@ def normalize_db_spectrogram(db_spec, high=20.0, low=-100.0):
     """
     mid = (low + high) / 2.0  # -40
     scale = (high - mid)  # 60
-    return (db_spec + mid) / scale
+    return (db_spec - mid) / scale
 
 
 def recover_spectrogram(power_spec, original_phase):
