@@ -8,6 +8,7 @@ import torchvision
 from .schmidt_sda import SchmidtSDA
 from .dae_unet import DansuhDenoisingCNN
 from base_trainer import NetworkTrainer, TrainStage
+from utils.spectrogram import denormalize_db_spectrogram
 
 
 class DansuhNetTrainer(NetworkTrainer):
@@ -22,7 +23,7 @@ class DansuhNetTrainer(NetworkTrainer):
         input_data_dir = config['data_dir']
 
         model = DansuhDenoisingCNN()
-        dataloader_maker = VCTKLoaderMaker(input_data_dir, batch_size, use_channel=True)
+        dataloader_maker = VCTKLoaderMaker(input_data_dir, batch_size, use_channel=True, use_db_spec=True)
         # mean squared error loss
         criterion = nn.MSELoss(reduction='elementwise_mean')
         optimizer = optim.Adam(params=model.parameters(),
@@ -176,10 +177,18 @@ class SchmidtSDATrainer(NetworkTrainer):
         # TODO: make this static resource
         # inverse of mel spectrogram matrix that can revert mel-spec to power-spectrogram
         mel_basis_inv = np.matrix(librosa.filters.mel(sr, n_fft, n_mels=n_mels)).I
+
         # convert torch Tensor to numpy.ndarray
         imgs = imgs.cpu().detach().numpy()
         out_imgs = []
-        for mel_spec in imgs:
+
+        # these are normalized db-scale mel-spectrograms
+        for mel_spec_db_norm in imgs:
+            # normalized -> denormalized
+            mel_spec_db = denormalize_db_spectrogram(mel_spec_db_norm)
+            # db-scale -> mel-spec
+            mel_spec = librosa.db_to_power(mel_spec_db)
+            # mel-spec -> power-spectrum
             spec = np.dot(mel_basis_inv, mel_spec)
             # convert the power spectrum to db for better visualization
             img = librosa.power_to_db(spec, ref=np.max)
