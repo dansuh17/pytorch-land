@@ -2,6 +2,8 @@
 tags
 venv/
 test/
+data_in/
+data_out/
 
 ### OSX
 ._*

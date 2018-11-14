@@ -4,9 +4,10 @@ import torch.nn.functional as F
 
 
 class ResBlock(nn.Module):
-    def __init__(self, in_channels, out_channels):
+    def __init__(self, in_channels, out_channels, no_last_relu=False):
         super().__init__()
         self.resample_required = in_channels != out_channels
+        self.no_last_relu = no_last_relu
 
         conv_layers = []
         conv_layers.extend([
@@ -22,6 +23,7 @@ class ResBlock(nn.Module):
             ])
         self.conv_layers = nn.Sequential(*conv_layers)
 
+        # resample layer - used if the channels are downsized
         if self.resample_required:
             self.downsampler = nn.Sequential(
                 nn.Conv2d(in_channels, out_channels, kernel_size=1),
@@ -35,35 +37,64 @@ class ResBlock(nn.Module):
             x = self.conv_layers(x) + self.downsampler(x)
         else:
             x = self.conv_layers(x) + x
-        return F.relu(x, inplace=True)
+        # ReLU at the last layer may not be required for the final layer for generation
+        return x if self.no_last_relu else F.relu(x, inplace=True)
 
 
-# resnet based denoiser
+# resnet + U-Net based denoiser
 class DansuhDenoisingCNN(nn.Module):
     """
     My own denoising neural network.
     """
     def __init__(self):
         super().__init__()
-        self.resblocks = nn.Sequential(
-            ResBlock(in_channels=1, out_channels=4),
-            ResBlock(4, 16),
-            ResBlock(16, 16),
-            ResBlock(16, 64),
-            ResBlock(64, 128),
-            ResBlock(128, 256),
-            ResBlock(256, 512),
-            ResBlock(512, 256),
-            ResBlock(256, 128),
-            ResBlock(128, 64),
-            ResBlock(64, 16),
-            ResBlock(16, 1),
-        )
+        self.res_up1 = ResBlock(in_channels=1, out_channels=4, no_last_relu=True)
+        self.res_up2 = ResBlock(4, 16)
+        self.res_up3 = ResBlock(16, 16)
+        self.res_up4 = ResBlock(16, 64)
+        self.res_up5 = ResBlock(64, 64)
+        self.res_up6 = ResBlock(64, 128)
+        self.res_up7 = ResBlock(128, 128)
+        self.res_up8 = ResBlock(128, 256)
+        self.res_up9 = ResBlock(256, 256)
+        self.res_up10 = ResBlock(256, 512)
+        self.res_zenith = ResBlock(512, 512)
+        self.res_down10 = ResBlock(512, 512)
+        self.res_down9 = ResBlock(512, 256)
+        self.res_down8 = ResBlock(256, 256)
+        self.res_down7 = ResBlock(256, 128)
+        self.res_down6 = ResBlock(128, 128)
+        self.res_down5 = ResBlock(128, 64)
+        self.res_down4 = ResBlock(64, 64)
+        self.res_down3 = ResBlock(64, 16)
+        self.res_down2 = ResBlock(16, 16)
+        self.res_down1 = ResBlock(16, 1, no_last_relu=True)
 
         self.apply(self.init_weights)
 
     def forward(self, x):
-        return self.resblocks(x)
+        up1 = self.res_up1(x)
+        up2 = self.res_up2(up1)
+        up3 = self.res_up3(up2)
+        up4 = self.res_up4(up3)
+        up5 = self.res_up5(up4)
+        up6 = self.res_up6(up5)
+        up7 = self.res_up7(up6)
+        up8 = self.res_up8(up7)
+        up9 = self.res_up9(up8)
+        up10 = self.res_up10(up9)
+        out = self.res_zenith(up10)
+        out = self.res_down10(out) + up10
+        out = self.res_down9(out) + up9
+        out = self.res_down8(out) + up8
+        out = self.res_down7(out) + up7
+        out = self.res_down6(out) + up6
+        out = self.res_down5(out) + up5
+        out = self.res_down4(out) + up4
+        out = self.res_down3(out) + up3
+        out = self.res_down2(out) + up2
+        out = self.res_down1(out)
+        return out
 
     @staticmethod
     def init_weights(m):

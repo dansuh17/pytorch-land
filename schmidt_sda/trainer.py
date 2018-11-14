@@ -23,6 +23,7 @@ class DansuhNetTrainer(NetworkTrainer):
 
         model = DansuhDenoisingCNN()
         dataloader_maker = VCTKLoaderMaker(input_data_dir, batch_size, use_channel=True)
+        # mean squared error loss
         criterion = nn.MSELoss(reduction='elementwise_mean')
         optimizer = optim.Adam(params=model.parameters(),
                                lr=self.lr_init)

@@ -32,6 +32,7 @@ from .loader_maker import DataLoaderMaker
 
 
 N_MELS = 40  # number of mel filters
+SPLIT_SIZE = 40  # chunk size to split into
 # basic info of vctk dataset used for unzipping
 CLEAN_TESTSET_WAV = 'clean_testset_wav'
 CLEAN_TRAINSET_28SPK_WAV = 'clean_trainset_28spk_wav'
@@ -46,15 +47,19 @@ NOISY_TRAINSET_DIR = 'noisy_trainset'
 
 class VCTKLoaderMaker(DataLoaderMaker):
     """Class that helps creating DataLoader instances for VCTK dataset."""
-    def __init__(self, data_path: str, batch_size: int, num_workers=4, use_channel=False):
+    def __init__(self, data_path: str, batch_size: int, num_workers=8,
+                 use_channel=False, use_db_spec=False):
         super().__init__()
         self.batch_size = batch_size
         self.num_workers = num_workers
 
         # create datasets
-        self.train_dataset = NoisyVCTKSpectrogram(data_path, use_channel)
-        self.validate_dataset = NoisyVCTKSpectrogram(data_path, use_channel)
-        self.test_dataset = NoisyVCTKSpectrogram(data_path, use_channel)
+        self.train_dataset = NoisyVCTKSpectrogram(
+            data_path, use_channel, use_db_spec=use_db_spec)
+        self.validate_dataset = NoisyVCTKSpectrogram(
+            data_path, use_channel, use_db_spec=use_db_spec)
+        self.test_dataset = NoisyVCTKSpectrogram(
+            data_path, use_channel, use_db_spec=use_db_spec)
 
         # calculate indices out of dataset size
         num_data = len(self.train_dataset)
@@ -98,59 +103,6 @@ class VCTKLoaderMaker(DataLoaderMaker):
             num_workers=self.num_workers,
             batch_size=self.batch_size)
         return test_dataloader
-
-
-# deprecated
-def load_vctk_dataloaders(data_path: str, batch_size: int):
-    """
-    Load VCTK dataset (in whatever form) dataloaders.
-
-    Args:
-        data_path (str): data path where datasets are located
-        batch_size (int): size of batch
-
-    Returns:
-        train_dataloader, validate_dataloader, test_dataloader
-    """
-    # create datasets
-    train_dataset = NoisyVCTKSpectrogram(data_path)
-    validate_dataset = NoisyVCTKSpectrogram(data_path)
-    test_dataset = NoisyVCTKSpectrogram(data_path)
-
-    # calculate indices out of dataset size
-    num_data = len(train_dataset)
-    indices = list(range(num_data))
-    random.shuffle(indices)
-    num_train = math.floor(num_data * 0.8)
-    num_valtest = num_data - num_train
-    num_validate = num_valtest // 2
-
-    train_idx, valtest_idx = indices[:num_train], indices[num_train:]
-    validate_idx, test_idx = valtest_idx[:num_validate], valtest_idx[num_validate:]
-
-    # create dataloaders
-    train_dataloader = DataLoader(
-        train_dataset,
-        sampler=sampler.SubsetRandomSampler(train_idx),
-        pin_memory=True,
-        drop_last=True,
-        num_workers=4,
-        batch_size=batch_size)
-    validate_dataloader = DataLoader(
-        validate_dataset,
-        sampler=sampler.SubsetRandomSampler(validate_idx),
-        pin_memory=True,
-        drop_last=True,
-        num_workers=4,
-        batch_size=batch_size)
-    test_dataloader = DataLoader(
-        test_dataset,
-        sampler=sampler.SubsetRandomSampler(test_idx),
-        pin_memory=True,
-        drop_last=True,
-        num_workers=4,
-        batch_size=batch_size)
-    return train_dataloader, validate_dataloader, test_dataloader
 
 
 def unpack_dataset(fname: str, out_path: str):
@@ -320,7 +272,7 @@ def preprocess():
         out_path=out_path,
         noisy_dir=NOISY_TRAINSET_DIR,
         clean_dir=CLEAN_TRAINSET_DIR,
-        split_size=40,
+        split_size=SPLIT_SIZE,
     )
     # preprocess test set
     noisy_vctk_preprocess(
@@ -328,7 +280,7 @@ def preprocess():
         out_path=out_path,
         noisy_dir=NOISY_TESTSET_WAV,
         clean_dir=CLEAN_TESTSET_WAV,
-        split_size=40,
+        split_size=SPLIT_SIZE,
     )
 
     ### UNCOMMENT BELOW TO PROCESS ORIGINAL SPECTROGRAMS FOR TRAINING SET
@@ -345,7 +297,7 @@ def preprocess():
         out_path=out_path_test,
         noisy_dir=NOISY_TESTSET_WAV,
         clean_dir=CLEAN_TESTSET_WAV,
-        split_size=40,
+        split_size=SPLIT_SIZE,
         mel=False,
     )
 
@@ -353,15 +305,19 @@ def preprocess():
 if __name__ == '__main__':
     preprocess()
 
-    ### uncomment this for extracting local test set
+    librosa.power_to_db
+
+    # # uncomment this for extracting local test set
     # noisy_vctk_preprocess(
     #     in_path='test',
     #     out_path='test/test_processed',
     #     noisy_dir=NOISY_TESTSET_WAV,
-    #     clean_dir=CLEAN_TESTSET_WAV)
+    #     clean_dir=CLEAN_TESTSET_WAV,
+    #     split_size=SPLIT_SIZE)
     # noisy_vctk_preprocess(
     #     in_path='test',
     #     out_path='test/test_processed_spectrogram',
     #     noisy_dir=NOISY_TESTSET_WAV,
     #     clean_dir=CLEAN_TESTSET_WAV,
-    #     mel=False)
+    #     mel=False,
+    #     split_size=SPLIT_SIZE)

@@ -36,22 +36,22 @@ def denormalize_db_spectrogram(spec, top_db=80.0, mean_db=50.0):
     return spec * top_db + mean_db
 
 
-def normalize_db_spectrogram(db_spec, top_db=80.0):
+def normalize_db_spectrogram(db_spec, top_db=20.0, low_db=-100.0):
     """
     Normalizes db spectrum with zero mean and unit variance.
-    In normal cases, librosa generates db spectrum having 80dB as maximum.
-    Thus, specifying the `top_db` will normalize assuming the
-    spectrum lies within such range.
+    In normal cases, librosa generates db spectrum having -100dB as maximum.
 
     Args:
         db_spec: db spectrum
-        top_db (float): maximum decibel range
+        top_db (float): maximum decibel value
+        low_db (float): minimum decibel value
 
     Returns:
         normalized db spectrum
     """
-    mean = np.mean(db_spec)
-    return (db_spec - mean) / top_db
+    middle = (top_db + low_db) / 2.0
+    norm_scale = top_db - middle
+    return (db_spec + norm_scale) / norm_scale
 
 
 def recover_spectrogram(power_spec, original_phase):
