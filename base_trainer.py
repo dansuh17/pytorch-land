@@ -196,17 +196,19 @@ class NetworkTrainer(ABC):
         os.makedirs(path, exist_ok=True)
         return path
 
-    def fit(self):
+    def fit(self, use_val_metric=True):
         """Run the entire training process."""
+        print('Using validation metric for best model : {}'.format(use_val_metric))
         best_metric = None
         for _ in range(self.epoch, self.total_epoch):
-
             train_metrics = self.train()
-            # compare the train metric and save the best model - TODO: should I use the validation metric?
-            best_metric = self._save_best_model(self.models, best_metric, train_metrics)
 
             # run upon validation set
             val_metrics = self.validate()
+
+            # compare the metric and save the best model
+            target_metric = val_metrics if use_val_metric else train_metrics
+            best_metric = self._save_best_model(self.models, best_metric, target_metric)
 
             # update learning rate based on validation metric
             if self.lr_schedulers is not None:
