@@ -81,9 +81,9 @@ class InfoGanTrainer(NetworkTrainer):
             noise_size (int): noise vector length
 
         Returns:
-            noise vector 'z' with size (batch_size, noise_size, 1)
+            noise vector 'z' with size (batch_size, noise_size)
         """
-        noise_dim = (batch_size, noise_size, 1)
+        noise_dim = (batch_size, noise_size)
         return torch.randn(noise_dim).to(self.device)
 
     def create_discrete_latent_code(self, batch_size: int, code_size: int):
@@ -95,7 +95,7 @@ class InfoGanTrainer(NetworkTrainer):
             code_size (int): discrete latent code length
 
         Returns:
-            discrete latent code with size (batch_size, code_size, 1)
+            discrete latent code with size (batch_size, code_size)
         """
         single_prob = 1 / code_size
         prob_array = [single_prob] * code_size  # probability follows uniform distribution
@@ -111,7 +111,7 @@ class InfoGanTrainer(NetworkTrainer):
             code_size (int): continuous latent code length
 
         Returns:
-            continuos latent code vector with size (batch_size, code_size, 1)
+            continuos latent code vector with size (batch_size, code_size)
         """
         random_uniform_vec = np.random.uniform(low=-1.0, high=1.0, size=(batch_size, code_size))
         return torch.from_numpy(random_uniform_vec).float().to(self.device)
