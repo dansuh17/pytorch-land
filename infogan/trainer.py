@@ -239,8 +239,8 @@ class InfoGanTrainer(NetworkTrainer):
                 break  # no need to iterate if not training
 
             # train on information loss term
-            _, target_codes = disc_code_in.max(dim=0)
-            disc_loss = disc_code_crit(disc_code_out, target_codes)  # cross entropy
+            # _, target_codes = disc_code_in.max(dim=0)
+            disc_loss = disc_code_crit(disc_code_out, disc_code_in)  # cross entropy
             cont_loss = cont_code_crit(cont_code_out, cont_code_in)  # mean squared error
             info_loss = disc_loss + cont_loss
 
