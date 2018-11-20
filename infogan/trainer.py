@@ -3,7 +3,7 @@ import itertools
 import torch
 from torch import nn
 import torchvision
-from numpy import np
+import numpy as np
 
 from datasets.img_popular import MNISTLoaderMaker
 from base_trainer import NetworkTrainer, TrainStage
