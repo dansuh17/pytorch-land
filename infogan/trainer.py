@@ -20,12 +20,13 @@ class InfoGanTrainer(NetworkTrainer):
         self.noise_size = config['noise_size']
         self.cont_code_size = config['continuous_code_size']
         self.disc_code_size = config['discrete_code_size']
-        self.code_size = self.noise_size + self.cont_code_size + self.disc_code_size
+        self.code_size = self.cont_code_size + self.disc_code_size
+        self.input_size = self.noise_size + self.code_size
 
         self.height = config['height']
         self.width = config['width']
         img_size = (1, self.height, self.width)
-        g_input = (self.code_size, 1, 1)
+        g_input = (self.input_size, 1, 1)
         inputs = (g_input, img_size)
 
         self.display_imgs = config['display_imgs']
@@ -35,7 +36,7 @@ class InfoGanTrainer(NetworkTrainer):
 
         # create models
         generator = InfoGanMnistGenerator()
-        discriminator = InfoGanMnistDiscriminator(img_size, self.code_size)
+        discriminator = InfoGanMnistDiscriminator(img_size, self.noise_size, self.code_size)
         models = (generator, discriminator)
 
         # set data loader maker

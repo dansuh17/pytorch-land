@@ -39,9 +39,10 @@ class InfoGanMnistGenerator(nn.Module):
 
 
 class InfoGanMnistDiscriminator(nn.Module):
-    def __init__(self, img_size: tuple, code_size: int):
+    def __init__(self, img_size: tuple, noise_size: int, code_size: int):
         super().__init__()
         self.numel = reduce(lambda x, y: x * y, img_size)
+        self.noise_size = noise_size
         self.code_size = code_size
         # shared layers for D and Q
         self.conv_part = nn.Sequential(
@@ -85,6 +86,8 @@ class InfoGanMnistDiscriminator(nn.Module):
 
 
 if __name__ == '__main__':
+    noise_size = 62
+    code_size = 12
     latent_code_size = 74
     zc = torch.randn((10, latent_code_size))
     g = InfoGanMnistGenerator()
@@ -92,7 +95,8 @@ if __name__ == '__main__':
     output = g(zc)
     print(output.size())
 
-    d = InfoGanMnistDiscriminator(img_size=(1, 28, 28), code_size=latent_code_size)
+    d = InfoGanMnistDiscriminator(
+        img_size=(1, 28, 28), noise_size=noise_size, code_size=code_size)
     print(d)
     disc_out, latent_code_repr = d(output)
     print(disc_out.size())
