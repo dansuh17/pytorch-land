@@ -127,6 +127,8 @@ class NetworkTrainer(ABC):
         # self.input_sizes is tuple of tuples or torch.Size()s
         if len(self.models) == 1:
             self.input_sizes = (input_size, )
+        else:
+            self.input_sizes = input_size
         # input sizes and models should have equal lengths - input sizes assigned per models!
         assert len(self.input_sizes) == len(self.models)
 
