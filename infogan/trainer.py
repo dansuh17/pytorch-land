@@ -154,20 +154,19 @@ class InfoGanTrainer(NetworkTrainer):
             split_size_or_sections=[noise_size, disc_code_size, cont_code_size],
             dim=1)
 
-    def parse_disc_output(self, disc_output):
+    def parse_disc_output_code(self, disc_output_code):
         """
-        Splits the output of discriminator into :
-        [discriminated_results, discrete_latent_code_logits, reconstructed_continuous_code]
+        Splits the output of discriminator's code vector into :
+        [discrete_latent_code_logits, reconstructed_continuous_code]
 
         Args:
-            disc_output (torch.Tensor): discriminator output
+            disc_output_code (torch.Tensor): discriminator output
 
         Returns:
-            (disc_out, discrete_logits, reconstructed_cont_code)
+            (discrete_logits, reconstructed_cont_code)
         """
-        return self.parse_latent(
-            disc_output, noise_size=1,  # discriminator is same as reducing z -> 1-dim logit
-            disc_code_size=self.disc_code_size, cont_code_size=self.cont_code_size)
+        return torch.split(
+            disc_output_code, [self.disc_code_size, self.cont_code_size], dim=1)
 
     def run_step(self, model, criteria, optimizer, input_, train_stage, *args, **kwargs):
         # required information
@@ -195,10 +194,9 @@ class InfoGanTrainer(NetworkTrainer):
                 disc_code_size=self.disc_code_size,
                 cont_code_size=self.cont_code_size)
 
-            disc_out_fake = discriminator(generator(latent_vec).detach())  # detach to prevent generator training
-            classified_fake, _, _ = self.parse_disc_output(disc_out_fake)
-            disc_out_real = discriminator(imgs)
-            classified_real, _, _ = self.parse_disc_output(disc_out_real)
+            # detach to prevent generator training
+            classified_fake, _ = discriminator(generator(latent_vec).detach())
+            classified_real, _ = discriminator(imgs)
 
             # calculate losses
             fake_loss = d_crit(classified_fake, invalid)
@@ -225,8 +223,8 @@ class InfoGanTrainer(NetworkTrainer):
             noise_vector, disc_code_in, cont_code_in = self.parse_latent(latent_vec)
 
             generated = generator(latent_vec)
-            disc_out = discriminator(generated)
-            classified_fake, disc_code_out, cont_code_out = self.parse_disc_output(disc_out)
+            classified_fake, code_prob = discriminator(generated)
+            disc_code_out, cont_code_out = self.parse_disc_output_code(code_prob)
 
             loss_g = d_crit(classified_fake, valid)  # generator wants to make generated images 'valid'
 
