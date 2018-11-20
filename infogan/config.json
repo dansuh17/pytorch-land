@@ -1,0 +1,11 @@
+{
+  "height": 64,
+  "width": 64,
+  "noise_size": 62,
+  "continuous_code_size": 2,
+  "discrete_code_size": 10,
+  "display_imgs": 8,
+  "lr_init": 0.002,
+  "epoch": 200,
+  "batch_size": 128
+}
