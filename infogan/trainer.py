@@ -220,7 +220,8 @@ class InfoGanTrainer(NetworkTrainer):
                 disc_code_size=self.disc_code_size,
                 cont_code_size=self.cont_code_size)
             # separate representation for loss calculation
-            noise_vector, disc_code_in, cont_code_in = self.parse_latent(latent_vec)
+            noise_vector, disc_code_in, cont_code_in = self.parse_latent(
+                latent_vec, self.noise_size, self.disc_code_size, self.cont_code_size)
 
             generated = generator(latent_vec)
             classified_fake, code_prob = discriminator(generated)
