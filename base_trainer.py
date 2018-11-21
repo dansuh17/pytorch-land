@@ -315,7 +315,6 @@ class NetworkTrainer(ABC):
                 self.log_metric(self.writer, metric, self.epoch, self.train_step)
 
             if self.train_step % 500 == 0:  # save models
-                self._save_all_modules()
                 self._save_module_summary_all()
 
     def pre_epoch_finish(self, input_, output, metric_manager: MetricManager, train_stage: TrainStage):
@@ -332,6 +331,9 @@ class NetworkTrainer(ABC):
 
         if train_stage == TrainStage.TRAIN:
             self.save_checkpoint()
+
+        # save all modules at the end of epoch
+        self._save_all_modules()
 
     def save_checkpoint(self, prefix=''):
         """Saves the model and training checkpoint.

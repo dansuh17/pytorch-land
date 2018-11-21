@@ -236,13 +236,12 @@ class InfoGanTrainer(NetworkTrainer):
                 optimizer_g.zero_grad()
                 loss_g.backward(retain_graph=True)
                 optimizer_g.step()
-            else:
-                break  # no need to iterate if not training
 
             # train on information loss term
             _, target_codes = disc_code_in.max(dim=1)  # max over 1st dimension
             disc_loss = disc_code_crit(disc_code_out, target_codes)  # cross entropy
             cont_loss = cont_code_crit(cont_code_out, cont_code_in)  # mean squared error
+
             info_loss = self.info_lambda * (disc_loss + cont_loss)
 
             if train_stage == TrainStage.TRAIN:
@@ -262,7 +261,7 @@ class InfoGanTrainer(NetworkTrainer):
             cont_code_in,
             imgs
         )
-        loss = (loss_g, loss_d, fake_loss, real_loss, info_loss)
+        loss = (loss_g, loss_d, fake_loss, real_loss, info_loss, disc_loss, cont_loss)
         return output, loss
 
     @property
@@ -282,11 +281,13 @@ class InfoGanTrainer(NetworkTrainer):
         accuracy = (specificity + recall) / 2.0
         return {
             'g_loss': loss[0].item(),
-            'g_loss_with_info': loss[0].iteam() + loss[4].item(),
+            'g_loss_with_info': loss[0].item() + loss[4].item(),
             'd_loss': loss[1].item(),
             'd_loss_fake': loss[2].item(),
             'd_loss_real': loss[3].item(),
             'info_loss': loss[4].item(),
+            'disc_loss': loss[5].item(),
+            'cont_loss': loss[6].item(),
             'd_accuracy': accuracy.item(),
             'd_specificity': specificity.item(),
             'd_recall': recall.item(),
