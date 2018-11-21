@@ -70,6 +70,8 @@ class InfoGanTrainer(NetworkTrainer):
             models, loader_maker, criteria, optimizers,
             epoch=self.epoch, input_size=inputs, lr_scheduler=None)
 
+        self.test_vector = self.generate_test_vector()
+
         # TODO: move to config?
         self.iter_g = 1
         self.iter_d = 1
@@ -88,7 +90,7 @@ class InfoGanTrainer(NetworkTrainer):
         noise_dim = (batch_size, noise_size)
         return torch.randn(noise_dim).to(self.device)
 
-    def create_discrete_latent_code(self, batch_size: int, code_size: int):
+    def create_discrete_latent_code(self, batch_size: int, code_size: int, pick_idx: int=None, random_val=True):
         """
         Creates discrete latent code vector.
 
@@ -99,8 +101,13 @@ class InfoGanTrainer(NetworkTrainer):
         Returns:
             discrete latent code with size (batch_size, code_size)
         """
-        single_prob = 1 / code_size
-        prob_array = [single_prob] * code_size  # probability follows uniform distribution
+        if random_val:
+            single_prob = 1 / code_size
+            prob_array = [single_prob] * code_size  # probability follows uniform distribution
+        else:
+            assert pick_idx is not None and pick_idx < code_size
+            prob_array = [0.0] * code_size
+            prob_array[pick_idx] = 1.0  # mark one index
         onehot_vec = np.random.multinomial(n=1, pvals=prob_array, size=batch_size)
         return torch.from_numpy(onehot_vec).float().to(self.device)
 
@@ -134,7 +141,7 @@ class InfoGanTrainer(NetworkTrainer):
         """
         z = self.create_noise_vector(batch_size, noise_size=noise_size)
         c_cont = self.create_continuous_latent_code(batch_size, code_size=cont_code_size)
-        c_disc = self.create_discrete_latent_code(batch_size, code_size=disc_code_size)
+        c_disc = self.create_discrete_latent_code(batch_size, code_size=disc_code_size, random_val=True)
         return torch.cat((z, c_disc, c_cont), dim=1).to(self.device)
 
     def parse_latent(self, latent_vector, noise_size: int,
@@ -293,14 +300,37 @@ class InfoGanTrainer(NetworkTrainer):
             'd_recall': recall.item(),
         }
 
+    def generate_test_vector(self):
+        # generate single noise input
+        z = self.create_noise_vector(1, noise_size=self.noise_size)
+        c_cont = self.create_continuous_latent_code(1, code_size=self.cont_code_size)
+
+        # generate different discrete code for each discrete slots
+        disc_vecs = []
+        for i in range(self.disc_code_size):
+            c_disc = self.create_discrete_latent_code(1, code_size=self.disc_code_size, pick_idx=i)
+            disc_vecs.append(c_disc)
+
+        vectors = []
+        for i in range(self.disc_code_size):
+            test_vector_batch = torch.cat((z, c_cont, disc_vecs[i]), dim=1)
+            vectors.append(test_vector_batch)
+        return torch.cat(tuple(vectors), dim=0).to(self.device)
+
     def pre_epoch_finish(self, input, output, metric_manager, train_stage: TrainStage):
         """Add example images from validation step just before the end of epoch training."""
+        generator, _ = self.models
+        test_gen_imgs = generator(self.test_vector).detach().numpy()
+
         if train_stage == TrainStage.VALIDATE:
             generated_imgs, real_imgs = output[0], output[-1]
             self.add_generated_image(
                 generated_imgs, nrow=self.display_imgs, name='generated')
             self.add_generated_image(
                 real_imgs, nrow=self.display_imgs, name='real')
+            # add test images for discrete codes
+            self.add_generated_image(
+                test_gen_imgs, nrow=self.disc_code_size, name='discrete_test_imgs')
 
     def add_generated_image(self, imgs, nrow, name: str):
         grid = torchvision.utils.make_grid(imgs[:nrow, :], nrow=nrow, normalize=True)

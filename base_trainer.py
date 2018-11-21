@@ -417,13 +417,10 @@ class NetworkTrainer(ABC):
         Saves a single module.
 
         Args:
-            module (nn.Module):
+            module (nn.Module): module to be saved
             input_size (tuple): input dimensions
-            save_onnx (bool):
-            prefix:
-
-        Returns:
-
+            save_onnx (bool): save in ONNX format if True
+            prefix: prefix for file name
         """
         if save_onnx:
             import onnx
