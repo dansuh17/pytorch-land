@@ -44,8 +44,8 @@ class InfoGanTrainer(NetworkTrainer):
             data_root='data_in', batch_size=self.batch_size, naive_normalization=True)
 
         # create criteria
-        d_criterion = nn.CrossEntropyLoss()  # binary cross entropy loss
-        disc_code_criterion = nn.BCELoss()  # discrete code loss
+        d_criterion = nn.BCELoss()  # binary cross entropy loss
+        disc_code_criterion = nn.CrossEntropyLoss()  # discrete code loss
         cont_code_criterion = nn.MSELoss()  # continuous code loss
         criteria = (d_criterion, disc_code_criterion, cont_code_criterion)
 
