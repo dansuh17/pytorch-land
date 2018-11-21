@@ -33,6 +33,7 @@ class InfoGanTrainer(NetworkTrainer):
         self.batch_size = config['batch_size']
         self.lr_init = config['lr_init']
         self.epoch = config['epoch']
+        self.info_lambda = config['info_lambda']  # lambda term for info loss
 
         # create models
         generator = InfoGanMnistGenerator()
@@ -242,7 +243,7 @@ class InfoGanTrainer(NetworkTrainer):
             _, target_codes = disc_code_in.max(dim=1)  # max over 1st dimension
             disc_loss = disc_code_crit(disc_code_out, target_codes)  # cross entropy
             cont_loss = cont_code_crit(cont_code_out, cont_code_in)  # mean squared error
-            info_loss = disc_loss + cont_loss
+            info_loss = self.info_lambda * (disc_loss + cont_loss)
 
             if train_stage == TrainStage.TRAIN:
                 optimizer_info.zero_grad()
@@ -266,7 +267,7 @@ class InfoGanTrainer(NetworkTrainer):
 
     @property
     def standard_metric(self):
-        return 'g_loss', 'd_loss'  # must have each for each model
+        return 'g_loss_with_info', 'd_loss'  # must have each for each model
 
     @staticmethod
     def make_performance_metric(input_, output, loss):
@@ -281,6 +282,7 @@ class InfoGanTrainer(NetworkTrainer):
         accuracy = (specificity + recall) / 2.0
         return {
             'g_loss': loss[0].item(),
+            'g_loss_with_info': loss[0].iteam() + loss[4].item(),
             'd_loss': loss[1].item(),
             'd_loss_fake': loss[2].item(),
             'd_loss_real': loss[3].item(),
