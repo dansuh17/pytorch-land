@@ -208,7 +208,7 @@ class InfoGanTrainer(NetworkTrainer):
             # update parameters if training
             if train_stage == TrainStage.TRAIN:
                 optimizer_d.zero_grad()
-                loss_d.backward()
+                loss_d.backward(retain_graph=True)
                 optimizer_d.step()
             else:
                 break
@@ -234,7 +234,7 @@ class InfoGanTrainer(NetworkTrainer):
             # update parameters if training
             if train_stage == TrainStage.TRAIN:
                 optimizer_g.zero_grad()
-                loss_g.backward()
+                loss_g.backward(retain_graph=True)
                 optimizer_g.step()
             else:
                 break  # no need to iterate if not training
