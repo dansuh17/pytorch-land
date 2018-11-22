@@ -91,7 +91,8 @@ class InfoGanTrainer(NetworkTrainer):
         noise_dim = (batch_size, noise_size)
         return torch.randn(noise_dim).to(self.device)
 
-    def create_discrete_latent_code(self, batch_size: int, code_size: int, pick_idx: int=None, random_val=True):
+    def create_discrete_latent_code(
+            self, batch_size: int, code_size: int, pick_idx: int=None, random_val=True):
         """
         Creates discrete latent code vector.
 
@@ -183,9 +184,9 @@ class InfoGanTrainer(NetworkTrainer):
         imgs, _ = input_
         batch_size = imgs.size(0)
 
-        # create target values
-        valid = torch.ones((batch_size, 1)).to(self.device)  # mark valid
-        invalid = torch.zeros((batch_size, 1)).to(self.device)  # mark invalid
+        # create target values - this uses label switching (valid to 0, invalid to 1)
+        valid = torch.zeros((batch_size, 1)).to(self.device)  # mark valid
+        invalid = torch.ones((batch_size, 1)).to(self.device)  # mark invalid
 
         # prepare materials for training
         generator, discriminator = model
@@ -248,6 +249,9 @@ class InfoGanTrainer(NetworkTrainer):
             # train on information loss term
             _, target_codes = disc_code_in.max(dim=1)  # max over 1st dimension
             disc_loss = disc_code_crit(disc_code_out, target_codes)  # cross entropy
+            print('disc_code_output vs target_code : ')
+            print(disc_code_out)
+            print(target_codes)
             cont_loss = cont_code_crit(cont_code_out, cont_code_in)  # mean squared error
 
             info_loss = self.lambda_disc * disc_loss + self.lambda_cont * cont_loss
