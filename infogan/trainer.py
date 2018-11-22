@@ -197,14 +197,18 @@ class InfoGanTrainer(NetworkTrainer):
         assert(self.iter_d > 0)
         assert(self.iter_g > 0)
 
+        # generate input
+        latent_vec = self.create_input(
+            batch_size,
+            noise_size=self.noise_size,
+            disc_code_size=self.disc_code_size,
+            cont_code_size=self.cont_code_size)
+        # separate representation for loss calculation
+        noise_vector, disc_code_in, cont_code_in = self.parse_latent(
+            latent_vec, self.noise_size, self.disc_code_size, self.cont_code_size)
+
         # train discriminator
         for _ in range(self.iter_d):
-            latent_vec = self.create_input(
-                batch_size,
-                noise_size=self.noise_size,
-                disc_code_size=self.disc_code_size,
-                cont_code_size=self.cont_code_size)
-
             # detach to prevent generator training
             classified_fake, _ = discriminator(generator(latent_vec).detach())
             classified_real, _ = discriminator(imgs)
@@ -224,16 +228,7 @@ class InfoGanTrainer(NetworkTrainer):
 
         # train generator + information loss backprop
         for _ in range(self.iter_g):
-            # generate latent noise vector - from standard normal distribution
-            latent_vec = self.create_input(
-                batch_size,
-                noise_size=self.noise_size,
-                disc_code_size=self.disc_code_size,
-                cont_code_size=self.cont_code_size)
-            # separate representation for loss calculation
-            noise_vector, disc_code_in, cont_code_in = self.parse_latent(
-                latent_vec, self.noise_size, self.disc_code_size, self.cont_code_size)
-
+            # generated images
             generated = generator(latent_vec)
             classified_fake, code_prob = discriminator(generated)
             disc_code_out, cont_code_out = self.parse_disc_output_code(code_prob)
@@ -249,9 +244,6 @@ class InfoGanTrainer(NetworkTrainer):
             # train on information loss term
             _, target_codes = disc_code_in.max(dim=1)  # max over 1st dimension
             disc_loss = disc_code_crit(disc_code_out, target_codes)  # cross entropy
-            print('disc_code_output vs target_code : ')
-            print(disc_code_out)
-            print(target_codes)
             cont_loss = cont_code_crit(cont_code_out, cont_code_in)  # mean squared error
 
             info_loss = self.lambda_disc * disc_loss + self.lambda_cont * cont_loss
