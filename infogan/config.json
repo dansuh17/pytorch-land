@@ -8,5 +8,6 @@
   "lr_init": 0.002,
   "epoch": 200,
   "batch_size": 128,
-  "info_lambda": 1
+  "lambda_cont": 0.1,
+  "lambda_disc": 1
 }

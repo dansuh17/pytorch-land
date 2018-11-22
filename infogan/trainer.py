@@ -33,7 +33,8 @@ class InfoGanTrainer(NetworkTrainer):
         self.batch_size = config['batch_size']
         self.lr_init = config['lr_init']
         self.epoch = config['epoch']
-        self.info_lambda = config['info_lambda']  # lambda term for info loss
+        self.lambda_cont = config['lambda_cont']  # lambda term for continuous var
+        self.lambda_disc = config['lambda_disc']  # lambda term for discrete var
 
         # create models
         generator = InfoGanMnistGenerator()
@@ -249,7 +250,7 @@ class InfoGanTrainer(NetworkTrainer):
             disc_loss = disc_code_crit(disc_code_out, target_codes)  # cross entropy
             cont_loss = cont_code_crit(cont_code_out, cont_code_in)  # mean squared error
 
-            info_loss = self.info_lambda * (disc_loss + cont_loss)
+            info_loss = self.lambda_disc * disc_loss + self.lambda_cont * cont_loss
 
             if train_stage == TrainStage.TRAIN:
                 optimizer_info.zero_grad()
@@ -320,7 +321,8 @@ class InfoGanTrainer(NetworkTrainer):
     def pre_epoch_finish(self, input, output, metric_manager, train_stage: TrainStage):
         """Add example images from validation step just before the end of epoch training."""
         generator, _ = self.models
-        test_gen_imgs = generator(self.test_vector).detach().numpy()
+        # requires the tensor to be in CPU to convert to numpy
+        test_gen_imgs = generator(self.generate_test_vector()).detach().cpu()
 
         if train_stage == TrainStage.VALIDATE:
             generated_imgs, real_imgs = output[0], output[-1]
