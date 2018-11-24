@@ -52,12 +52,9 @@ class InfoGanTrainer(NetworkTrainer):
         criteria = (d_criterion, disc_code_criterion, cont_code_criterion)
 
         # create optimizers
-        optimizer_g = torch.optim.Adam(generator.parameters(), lr=self.lr_init, betas=(0.5, 0.999))
-        optimizer_d = torch.optim.Adam(discriminator.parameters(), lr=self.lr_init, betas=(0.5, 0.999))
-        optimizer_info = torch.optim.Adam(
-            itertools.chain(generator.parameters(), discriminator.parameters()),
-            lr=self.lr_init, betas=(0.5, 0.999))
-        optimizers = (optimizer_g, optimizer_d, optimizer_info)
+        optimizer_g = torch.optim.Adam(generator.parameters(), lr=0.001, betas=(0.5, 0.999))
+        optimizer_d = torch.optim.Adam(discriminator.parameters(), lr=0.0002, betas=(0.5, 0.999))
+        optimizers = (optimizer_g, optimizer_d)
 
         # learning rate schedulers
         # TODO: validate the effects of schedulers
@@ -89,7 +86,7 @@ class InfoGanTrainer(NetworkTrainer):
             noise vector 'z' with size (batch_size, noise_size)
         """
         noise_dim = (batch_size, noise_size)
-        return torch.randn(noise_dim).to(self.device)
+        return torch.rand(noise_dim).to(self.device)
 
     def create_discrete_latent_code(
             self, batch_size: int, code_size: int, pick_idx: int=None, random_val=True):
@@ -142,8 +139,8 @@ class InfoGanTrainer(NetworkTrainer):
             input vector of size (batch_size, (noise_size + disc_code_size + cont_code_size), 1)
         """
         z = self.create_noise_vector(batch_size, noise_size=noise_size)
-        c_cont = self.create_continuous_latent_code(batch_size, code_size=cont_code_size)
         c_disc = self.create_discrete_latent_code(batch_size, code_size=disc_code_size, random_val=True)
+        c_cont = self.create_continuous_latent_code(batch_size, code_size=cont_code_size)
         return torch.cat((z, c_disc, c_cont), dim=1).to(self.device)
 
     def parse_latent(self, latent_vector, noise_size: int,
@@ -184,13 +181,13 @@ class InfoGanTrainer(NetworkTrainer):
         imgs, _ = input_
         batch_size = imgs.size(0)
 
-        # create target values - this uses label switching (valid to 0, invalid to 1)
-        valid = torch.zeros((batch_size, 1)).to(self.device)  # mark valid
-        invalid = torch.ones((batch_size, 1)).to(self.device)  # mark invalid
+        # create target values
+        valid = torch.ones((batch_size, 1)).to(self.device)  # mark valid
+        invalid = torch.zeros((batch_size, 1)).to(self.device)  # mark invalid
 
         # prepare materials for training
         generator, discriminator = model
-        optimizer_g, optimizer_d, optimizer_info = optimizer
+        optimizer_g, optimizer_d = optimizer
         d_crit, disc_code_crit, cont_code_crit = criteria
 
         # must be trained at least once
@@ -210,13 +207,22 @@ class InfoGanTrainer(NetworkTrainer):
         # train discriminator
         for _ in range(self.iter_d):
             # detach to prevent generator training
-            classified_fake, _ = discriminator(generator(latent_vec).detach())
+            classified_fake, code_prob = discriminator(generator(latent_vec).detach())
             classified_real, _ = discriminator(imgs)
+
+            # parse latent code outputs
+            disc_code_out, cont_code_out = self.parse_disc_output_code(code_prob)
+
+            # calculate information loss
+            _, target_codes = disc_code_in.max(dim=1)  # max over 1st dimension
+            disc_loss = disc_code_crit(disc_code_out, target_codes)  # cross entropy
+            cont_loss = cont_code_crit(cont_code_out, cont_code_in)  # mean squared error
+            info_loss = self.lambda_disc * disc_loss + self.lambda_cont * cont_loss
 
             # calculate losses
             fake_loss = d_crit(classified_fake, invalid)
             real_loss = d_crit(classified_real, valid)
-            loss_d = real_loss + fake_loss
+            loss_d = real_loss + fake_loss + info_loss
 
             # update parameters if training
             if train_stage == TrainStage.TRAIN:
@@ -230,30 +236,15 @@ class InfoGanTrainer(NetworkTrainer):
         for _ in range(self.iter_g):
             # generated images
             generated = generator(latent_vec)
-            classified_fake, code_prob = discriminator(generated)
-            disc_code_out, cont_code_out = self.parse_disc_output_code(code_prob)
 
-            loss_g = d_crit(classified_fake, valid)  # generator wants to make generated images 'valid'
+            # generator wants to make generated images 'valid'
+            loss_g = d_crit(classified_fake, valid) + info_loss
 
             # update parameters if training
             if train_stage == TrainStage.TRAIN:
                 optimizer_g.zero_grad()
-                loss_g.backward(retain_graph=True)
+                loss_g.backward()
                 optimizer_g.step()
-
-            # train on information loss term
-            _, target_codes = disc_code_in.max(dim=1)  # max over 1st dimension
-            disc_loss = disc_code_crit(disc_code_out, target_codes)  # cross entropy
-            cont_loss = cont_code_crit(cont_code_out, cont_code_in)  # mean squared error
-
-            info_loss = self.lambda_disc * disc_loss + self.lambda_cont * cont_loss
-
-            if train_stage == TrainStage.TRAIN:
-                optimizer_info.zero_grad()
-                info_loss.backward()
-                optimizer_info.step()
-            else:
-                break  # no need to iterate if not training
 
         # collect outputs and losses
         output = (
