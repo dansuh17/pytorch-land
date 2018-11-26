@@ -86,10 +86,10 @@ class InfoGanTrainer(NetworkTrainer):
             noise vector 'z' with size (batch_size, noise_size)
         """
         noise_dim = (batch_size, noise_size)
-        return torch.rand(noise_dim).to(self.device)
+        return torch.randn(noise_dim).to(self.device)
 
     def create_discrete_latent_code(
-            self, batch_size: int, code_size: int, pick_idx: int=None, random_val=True):
+            self, batch_size: int, code_size: int, pick_idx: int=None, random_val=False):
         """
         Creates discrete latent code vector.
 
@@ -207,7 +207,7 @@ class InfoGanTrainer(NetworkTrainer):
         # train discriminator
         for _ in range(self.iter_d):
             # detach to prevent generator training
-            classified_fake, code_prob = discriminator(generator(latent_vec).detach())
+            classified_fake, code_prob = discriminator(generator(latent_vec))
             classified_real, _ = discriminator(imgs)
 
             # parse latent code outputs
@@ -293,15 +293,12 @@ class InfoGanTrainer(NetworkTrainer):
         z = self.create_noise_vector(1, noise_size=self.noise_size)
         c_cont = self.create_continuous_latent_code(1, code_size=self.cont_code_size)
 
-        # generate different discrete code for each discrete slots
-        disc_vecs = []
-        for i in range(self.disc_code_size):
-            c_disc = self.create_discrete_latent_code(1, code_size=self.disc_code_size, pick_idx=i)
-            disc_vecs.append(c_disc)
-
+        # change only the discrete variable
         vectors = []
         for i in range(self.disc_code_size):
-            test_vector_batch = torch.cat((z, c_cont, disc_vecs[i]), dim=1)
+            c_disc = self.create_discrete_latent_code(
+                1, code_size=self.disc_code_size, pick_idx=i, random_val=False)
+            test_vector_batch = torch.cat((z, c_disc, c_cont), dim=1)
             vectors.append(test_vector_batch)
         return torch.cat(tuple(vectors), dim=0).to(self.device)
 
