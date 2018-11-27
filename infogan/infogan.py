@@ -4,6 +4,7 @@ from torch import nn
 
 
 class InfoGanMnistGenerator(nn.Module):
+    """Generator model for InfoGAN."""
     def __init__(self):
         super().__init__()
         self.input_dim = 74  # 10 categorical, 2 continuous, 62 noise
@@ -39,6 +40,12 @@ class InfoGanMnistGenerator(nn.Module):
 
 
 class InfoGanMnistDiscriminator(nn.Module):
+    """Discriminator model for InfoGAN.
+    This also shares layer with the model that learns the proxy distribution Q(c|x).
+
+    The last layers after the `linear_part` returns
+    separate values D(x) and Q(c|x), respectively.
+    """
     def __init__(self, img_size: tuple, noise_size: int, code_size: int):
         super().__init__()
         self.numel = reduce(lambda x, y: x * y, img_size)

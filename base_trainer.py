@@ -1,14 +1,19 @@
 import os
 from abc import ABC, abstractmethod
-import operator
+from typing import Dict
 import math
 from enum import Enum, unique
-from collections import defaultdict
+from collections import defaultdict, namedtuple
 import torch
 import torch.nn as nn
 from torch.optim.optimizer import Optimizer
 from datasets.loader_maker import DataLoaderMaker
 from tensorboardX import SummaryWriter
+
+
+"""Tuple storing model information."""
+ModelInfo = namedtuple(
+    'ModelInfo', ['model', 'input_size', 'metric', 'comparison'], defaults=[None])
 
 
 @unique
@@ -73,12 +78,11 @@ class NetworkTrainer(ABC):
     """
 
     def __init__(self,
-                 model,
+                 models: Dict[str, ModelInfo],
                  dataloader_maker: DataLoaderMaker,
                  criterion,
                  optimizer,
                  epoch: int,
-                 input_size,
                  output_dir='data_out',
                  num_devices=1,
                  seed: int=None,
@@ -113,24 +117,10 @@ class NetworkTrainer(ABC):
         # training devices to use
         self.device_ids = list(range(num_devices))
 
-        # PREPARE FIELD MODULES
-        # all fields that can have multiple instances are managed using tuples
-        # - this is easier to manage from within
-        # prepare model(s) for training
-        if isinstance(model, tuple):  # in case of having multiple models
-            self.model_name = '_'.join(map(lambda x: x.__class__.__name__, model))
-            self.models = tuple(map(self._register_model, model))
-        else:
-            self.model_name = model.__class__.__name__
-            self.models = (self._register_model(model), )
+        self.trainer_name = self.__class__.__name__
 
-        # self.input_sizes is tuple of tuples or torch.Size()s
-        if len(self.models) == 1:
-            self.input_sizes = (input_size, )
-        else:
-            self.input_sizes = input_size
-        # input sizes and models should have equal lengths - input sizes assigned per models!
-        assert len(self.input_sizes) == len(self.models)
+        # prepare model(s) for training
+        self.models: Dict[str, ModelInfo] = self._validate_model_dict(models)
 
         # setup and create output directories
         self.output_dir = output_dir
@@ -157,6 +147,22 @@ class NetworkTrainer(ABC):
         # initialize training process
         self.epoch = 0
         self.train_step = 0
+
+    def _validate_model_dict(self, models: Dict[str, ModelInfo]):
+        if not isinstance(models, dict):
+            raise ValueError(
+                'models should be an instance of dict, '
+                'while provided : {}'.format(type(models)))
+        for model_name in models:
+            model_info = models[model_name]
+            if not isinstance(model_info, ModelInfo):
+                raise ValueError(
+                    'Model info must have type : ' + ModelInfo.__class__.__name__)
+        for model_name in models:
+            model_info = models[model_name]
+            model = model_info.model
+            models[model_name] = model_info._replace(model=self._register_model(model))
+        return models
 
     @staticmethod
     def _make_tuple(obj):
@@ -223,13 +229,19 @@ class NetworkTrainer(ABC):
         print('Training complete.')
 
     @abstractmethod
-    def run_step(self, model, criteria, optimizer, input_, train_stage: TrainStage, *args, **kwargs):
+    def run_step(self,
+                 model: Dict[str, ModelInfo],
+                 criteria,
+                 optimizer,
+                 input_,
+                 train_stage: TrainStage,
+                 *args, **kwargs):
         """
         Run a single step.
         It is given all required instances for training.
 
         Args:
-            model (nn.Module | tuple[nn.Module]): models to train
+            model (Dict[str, ModelInfo]): models to train
             criteria: model criteria functions
             optimizer (Optimizer | tuple[Optimizer]): model optimizers
             input_ (torch.Tensor | tuple[torch.Tensor]): inputs to models
@@ -262,7 +274,7 @@ class NetworkTrainer(ABC):
             # this step is exposed to public for custom implementation
             # the parameters passed should have equal form as passed into the constructor
             output, loss = self.run_step(
-                self._make_single_or_tuple(self.models),
+                self.models,
                 self._make_single_or_tuple(self.criterions),
                 self._make_single_or_tuple(self.optimizers),
                 input_,
@@ -341,7 +353,11 @@ class NetworkTrainer(ABC):
         The checkpoint saves the state dictionary of various modules
         required for training. Usually this information is used to resume training.
         """
-        model_state = tuple(map(lambda m: m.module.state_dict(), self.models))
+        # get state_dict for all models
+        model_state = {}
+        for model_name in self.models:
+            model_state[model_name] = self.models[model_name].model.state_dict()
+
         optimizer_state = tuple(map(lambda m: m.state_dict(), self.optimizers))
 
         train_state = {
@@ -351,7 +367,7 @@ class NetworkTrainer(ABC):
             'models': model_state,  # tuple of states (even for len == 1)
             'optimizers': optimizer_state,  # tuple of states
         }
-        cptf = '{}{}_checkpoint_e{}.pth'.format(prefix, self.model_name, self.epoch)
+        cptf = '{}{}_checkpoint_e{}.pth'.format(prefix, self.trainer_name, self.epoch)
         torch.save(train_state, os.path.join(self.checkpoint_dir, cptf))
 
     def resume(self, filename: str):
@@ -367,9 +383,15 @@ class NetworkTrainer(ABC):
         self.epoch = cpt['epoch']
         self.train_step = cpt['step']
 
-        # load the model and optimizer  # TODO: consider when they are tuples
-        self.models = [m.load_state_dict(state_dict)
-                       for m, state_dict in zip(self.models, cpt['models'])]
+        # load the model and optimizer
+        model_state = cpt['models']
+        for model_name in self.models:
+            model_info = self.models[model_name]
+            model = model_info.model
+            # replace ModelInfo's field
+            self.models[model_name] = model_info._replace(
+                model=model.load_state_dict(model_state[model_name]))
+
         self.optimizers = [o.load_state_dict(state_dict)
                            for o, state_dict in zip(self.optimizers, cpt['optimizers'])]
 
@@ -383,34 +405,35 @@ class NetworkTrainer(ABC):
         """
         return data
 
-    def _save_best_model(self, models: tuple, prev_best_metric, curr_metric, comparison=operator.lt):
+    def _save_best_model(self, models: Dict[str, ModelInfo], prev_best_metric, curr_metric):
         if prev_best_metric is None:
             return curr_metric
 
-        standard_metric = self._make_tuple(self.standard_metric)
-        # match the length
-        if len(standard_metric) == 1 and len(models) != 1:
-            standard_metric *= len(models)
-
         best_metric = prev_best_metric
-        for m, input_sz, std_metric in zip(models, self.input_sizes, standard_metric):
+        for model_info in models.values():
+            model = model_info.model
+            compare_metric = model_info.metric
+            comparison = model_info.comparison
+            input_size = model_info.input_size
+
             # compare the standard metric, and if the standard performance metric
             # is better, then save the best model
             if comparison(
-                    curr_metric.mean(std_metric),
-                    prev_best_metric.mean(std_metric)):
+                    curr_metric.mean(compare_metric),
+                    prev_best_metric.mean(compare_metric)):
                 # onnx model saving may fail due to unsupported operators, etc.
                 try:
-                    self._save_module(m.module, input_sz, save_onnx=True, prefix='best_')
+                    self._save_module(model.module, input_size, save_onnx=True, prefix='best_')
                 except RuntimeError as onnx_err:
                     print('Saving onnx model failed : {}'.format(onnx_err))
-                self._save_module(m.module, input_sz, prefix='best')
-                best_metric.set_mean(std_metric, curr_metric.mean(std_metric))
+                self._save_module(model.module, input_size, prefix='best')
+                best_metric.set_mean(compare_metric, curr_metric.mean(compare_metric))
         return best_metric
 
     def _save_all_modules(self):
-        for m, input_sz in zip(self.models, self.input_sizes):
-            self._save_module(m.module, input_sz)
+        for model_info in self.models.values():
+            self._save_module(model_info.model.module,
+                              model_info.input_size)
 
     def _save_module(self, module, input_size: tuple, save_onnx=False, prefix=''):
         """
@@ -457,11 +480,15 @@ class NetworkTrainer(ABC):
                 writer.add_scalar('lr/{}'.format(idx), lr, step)
 
     def _save_module_summary_all(self, **kwargs):
-        for m, input_sz in zip(self.models, self.input_sizes):
-            self.save_module_summary(self.writer, m.module, self.train_step, **kwargs)
+        for model_info in self.models.values():
+            self._save_module_summary(self.writer,
+                                      model_info.model.module,
+                                      self.train_step,
+                                      **kwargs)
 
     @staticmethod
-    def save_module_summary(writer, module: nn.Module, step: int, save_histogram=False, verbose=False):
+    def _save_module_summary(writer, module: nn.Module, step: int,
+                             save_histogram=False, verbose=False):
         # warning: saving histograms is expensive - both time and space
         module_name = module.__class__.__name__  # to distinguish among different modules
         with torch.no_grad():

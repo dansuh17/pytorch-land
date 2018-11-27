@@ -1,4 +1,5 @@
-import itertools
+import operator
+from typing import Dict
 
 import torch
 from torch import nn
@@ -6,7 +7,7 @@ import torchvision
 import numpy as np
 
 from datasets.img_popular import MNISTLoaderMaker
-from base_trainer import NetworkTrainer, TrainStage
+from base_trainer import NetworkTrainer, TrainStage, ModelInfo
 from .infogan import InfoGanMnistGenerator, InfoGanMnistDiscriminator
 
 
@@ -27,11 +28,9 @@ class InfoGanTrainer(NetworkTrainer):
         self.width = config['width']
         img_size = (1, self.height, self.width)
         g_input = (self.input_size, 1, 1)
-        inputs = (g_input, img_size)
 
         self.display_imgs = config['display_imgs']
         self.batch_size = config['batch_size']
-        self.lr_init = config['lr_init']
         self.epoch = config['epoch']
         self.lambda_cont = config['lambda_cont']  # lambda term for continuous var
         self.lambda_disc = config['lambda_disc']  # lambda term for discrete var
@@ -39,7 +38,11 @@ class InfoGanTrainer(NetworkTrainer):
         # create models
         generator = InfoGanMnistGenerator()
         discriminator = InfoGanMnistDiscriminator(img_size, self.noise_size, self.code_size)
-        models = (generator, discriminator)
+        models = {
+            'InfoGAN_G': ModelInfo(
+                model=generator, input_size=g_input, metric='loss_g', comparison=operator.lt),
+            'InfoGAN_D': ModelInfo(model=discriminator, input_size=img_size, metric='loss_d'),
+        }
 
         # set data loader maker
         loader_maker = MNISTLoaderMaker(
@@ -52,8 +55,10 @@ class InfoGanTrainer(NetworkTrainer):
         criteria = (d_criterion, disc_code_criterion, cont_code_criterion)
 
         # create optimizers
-        optimizer_g = torch.optim.Adam(generator.parameters(), lr=0.001, betas=(0.5, 0.999))
-        optimizer_d = torch.optim.Adam(discriminator.parameters(), lr=0.0002, betas=(0.5, 0.999))
+        lr_init_g = config['lr_init_g']
+        lr_init_d = config['lr_init_d']
+        optimizer_g = torch.optim.Adam(generator.parameters(), lr=lr_init_g, betas=(0.5, 0.999))
+        optimizer_d = torch.optim.Adam(discriminator.parameters(), lr=lr_init_d, betas=(0.5, 0.999))
         optimizers = (optimizer_g, optimizer_d)
 
         # learning rate schedulers
@@ -65,8 +70,7 @@ class InfoGanTrainer(NetworkTrainer):
 
         # create this trainer
         super().__init__(
-            models, loader_maker, criteria, optimizers,
-            epoch=self.epoch, input_size=inputs, lr_scheduler=None)
+            models, loader_maker, criteria, optimizers, epoch=self.epoch, lr_scheduler=None)
 
         self.test_vector = self.generate_test_vector()
 
@@ -176,7 +180,8 @@ class InfoGanTrainer(NetworkTrainer):
         return torch.split(
             disc_output_code, [self.disc_code_size, self.cont_code_size], dim=1)
 
-    def run_step(self, model, criteria, optimizer, input_, train_stage, *args, **kwargs):
+    def run_step(self, model: Dict[str, ModelInfo],
+                 criteria, optimizer, input_, train_stage, *args, **kwargs):
         # required information
         imgs, _ = input_
         batch_size = imgs.size(0)
@@ -186,7 +191,8 @@ class InfoGanTrainer(NetworkTrainer):
         invalid = torch.zeros((batch_size, 1)).to(self.device)  # mark invalid
 
         # prepare materials for training
-        generator, discriminator = model
+        generator = model['InfoGAN_G'].model
+        discriminator = model['InfoGAN_D'].model
         optimizer_g, optimizer_d = optimizer
         d_crit, disc_code_crit, cont_code_crit = criteria
 
@@ -304,7 +310,7 @@ class InfoGanTrainer(NetworkTrainer):
 
     def pre_epoch_finish(self, input, output, metric_manager, train_stage: TrainStage):
         """Add example images from validation step just before the end of epoch training."""
-        generator, _ = self.models
+        generator = self.models['InfoGAN_G'].model
         # requires the tensor to be in CPU to convert to numpy
         test_gen_imgs = generator(self.generate_test_vector()).detach().cpu()
 
