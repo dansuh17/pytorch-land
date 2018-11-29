@@ -1,13 +1,12 @@
 """
-Implementation of DCGAN by Radford et al. - "Unsupervised Representation Learning with Deep Convolutional Generative Adversarial Networks
-" (2016)
+Implementation of f-GAN.
 """
 import torch
 from torch import nn
 
 
-class DCGANGenerator(nn.Module):
-    """Generator model of DCGAN."""
+class FGanGenerator(nn.Module):
+    """Generator model of f-GAN."""
     def __init__(self, input_dim: int):
         super().__init__()
         # create model with a stack of 5 convolutional layers
@@ -27,7 +26,7 @@ class DCGANGenerator(nn.Module):
             nn.BatchNorm2d(128),
             nn.ReLU(inplace=True),
             nn.ConvTranspose2d(128, 3, 4, 2, 1, bias=False),  # (3, 64, 64)
-            nn.Tanh(),
+            nn.Tanh()
         )
 
         self.apply(self.init_weights)
@@ -42,11 +41,10 @@ class DCGANGenerator(nn.Module):
             nn.init.constant_(m.bias, 0)
 
 
-class DCGANDiscriminator(nn.Module):
-    """Discriminator model of DCGAN."""
-    def __init__(self):
+class FGanDiscriminator(nn.Module):
+    """Discriminator model of f-GAN."""
+    def __init__(self, activation_func: nn.Module):
         super().__init__()
-        # TODO: generalize these magic numbers
         self.net = nn.Sequential(
             # input : (3, 64, 64)
             nn.Conv2d(
@@ -67,13 +65,13 @@ class DCGANDiscriminator(nn.Module):
             nn.LeakyReLU(0.2, inplace=True),
 
             nn.Conv2d(512, 1, 4, 1, 0, bias=False),  # (1, 1, 1)
-            nn.Sigmoid(),
         )
+        self.activation_func = activation_func  # output activation function
 
         self.apply(self.init_weights)
 
     def forward(self, x):
-        return self.net(x).view(-1, 1)
+        return self.activation_func(self.net(x)).view(-1, 1)
 
     @staticmethod
     def init_weights(m):
@@ -85,12 +83,12 @@ class DCGANDiscriminator(nn.Module):
 if __name__ == '__main__':
     # artificially create 4D tensor (representing a batch of 1D vector having size 100)
     z = torch.randn((3, 100, 1, 1))
-    g = DCGANGenerator(100)
+    g = FGanGenerator(100)
     print(g)
     output = g(z)
     print(output.size())
 
-    d = DCGANDiscriminator()
+    d = FGanDiscriminator(activation_func=nn.Sigmoid())
     print(d)
     disc_out = d(output)
     print(disc_out)

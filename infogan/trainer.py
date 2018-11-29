@@ -212,7 +212,6 @@ class InfoGanTrainer(NetworkTrainer):
 
         # train discriminator
         for _ in range(self.iter_d):
-            # detach to prevent generator training
             classified_fake, code_prob = discriminator(generator(latent_vec))
             classified_real, _ = discriminator(imgs)
 

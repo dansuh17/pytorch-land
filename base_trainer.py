@@ -136,7 +136,7 @@ class NetworkTrainer(ABC):
 
         # save any other states or variables to maintain
         self.total_epoch = epoch
-        self.criterions = self._make_tuple(criterion)
+        self.criterions = criterion
         self.optimizers = self._make_tuple(optimizer)
         if lr_scheduler is not None:
             self.lr_schedulers = self._make_tuple(lr_scheduler)
@@ -275,7 +275,7 @@ class NetworkTrainer(ABC):
             # the parameters passed should have equal form as passed into the constructor
             output, loss = self.run_step(
                 self.models,
-                self._make_single_or_tuple(self.criterions),
+                self.criterions,
                 self._make_single_or_tuple(self.optimizers),
                 input_,
                 train_stage)

@@ -1,0 +1,9 @@
+{
+  "latent_dim": 100,
+  "height": 28,
+  "width": 28,
+  "display_imgs": 10,
+  "lr_init": 0.001,
+  "epoch": 200,
+  "batch_size": 128
+}
