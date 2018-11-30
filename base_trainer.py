@@ -1,5 +1,6 @@
 import os
 import sys
+import operator
 from abc import ABC, abstractmethod
 from typing import Dict
 import math
@@ -15,10 +16,10 @@ from tensorboardX import SummaryWriter
 """Tuple storing model information."""
 if sys.hexversion >= 0x3070000:  # 'defaults' keyword appeared in ver. 3.7
     ModelInfo = namedtuple(
-        'ModelInfo', ['model', 'input_size', 'metric', 'comparison'], defaults=[None])
+        'ModelInfo', ['model', 'input_size', 'metric', 'comparison'], defaults=[operator.lt])
 else:
     ModelInfo = namedtuple('ModelInfo', ['model', 'input_size', 'metric', 'comparison'])
-    ModelInfo.__new__.__defaults__ = (None, )
+    ModelInfo.__new__.__defaults__ = (operator.lt, )
 
 
 @unique

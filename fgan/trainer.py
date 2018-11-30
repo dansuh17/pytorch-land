@@ -32,8 +32,8 @@ class FGanTrainer(NetworkTrainer):
         discriminator = FGanDiscriminator(activation_func=self.divergence.output_activation())
         models = {
             'FGan_G': ModelInfo(
-                model=generator, input_size=g_input, metric='loss_g', comparison=operator.lt),
-            'FGan_D': ModelInfo(model=discriminator, input_size=img_size, metric='loss_d'),
+                model=generator, input_size=g_input, metric='g_loss', comparison=operator.lt),
+            'FGan_D': ModelInfo(model=discriminator, input_size=img_size, metric='d_loss'),
         }
 
         # define loss functions, as defined according to the specific f-divergence metric
