@@ -10,7 +10,7 @@ from .divergence import GanDivergence, KLDivergence
 
 
 class FGanTrainer(NetworkTrainer):
-    """Trainer for DCGAN"""
+    """Trainer for f-GAN"""
     def __init__(self, config: dict):
         print('Configuration: ')
         print(config)

@@ -1,4 +1,5 @@
 import os
+import sys
 from abc import ABC, abstractmethod
 from typing import Dict
 import math
@@ -12,8 +13,14 @@ from tensorboardX import SummaryWriter
 
 
 """Tuple storing model information."""
-ModelInfo = namedtuple(
-    'ModelInfo', ['model', 'input_size', 'metric', 'comparison'], defaults=[None])
+if sys.hexversion >= 0x3070000:  # 'defaults' keywoard appeard in ver. 3.7
+    ModelInfo = namedtuple(
+        'ModelInfo', ['model', 'input_size', 'metric', 'comparison'], defaults=[None])
+else:
+    class ModelInfo(namedtuple('ModelInfo', ['model', 'input_size', 'metric', 'comparison'])):
+        __slots__ = ()
+        def __new__(cls, model, input_size, metric, comparison=None):
+            return super().__new__(cls, model, input_size, metric, comparison)
 
 
 @unique
