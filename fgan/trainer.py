@@ -25,11 +25,11 @@ class FGanTrainer(NetworkTrainer):
         self.batch_size = config['batch_size']
         self.epoch = config['epoch']
 
-        self.divergence = GanDivergence
+        self.divergence = GanDivergence()
 
         # create models
         generator = FGanGenerator(latent_dim)
-        discriminator = FGanDiscriminator(activation_func=self.divergence.output_activation)
+        discriminator = FGanDiscriminator(activation_func=self.divergence.output_activation())
         models = {
             'FGan_G': ModelInfo(
                 model=generator, input_size=g_input, metric='loss_g', comparison=operator.lt),

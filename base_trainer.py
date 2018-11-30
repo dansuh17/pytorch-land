@@ -13,14 +13,12 @@ from tensorboardX import SummaryWriter
 
 
 """Tuple storing model information."""
-if sys.hexversion >= 0x3070000:  # 'defaults' keywoard appeard in ver. 3.7
+if sys.hexversion >= 0x3070000:  # 'defaults' keyword appeared in ver. 3.7
     ModelInfo = namedtuple(
         'ModelInfo', ['model', 'input_size', 'metric', 'comparison'], defaults=[None])
 else:
-    class ModelInfo(namedtuple('ModelInfo', ['model', 'input_size', 'metric', 'comparison'])):
-        __slots__ = ()
-        def __new__(cls, model, input_size, metric, comparison=None):
-            return super().__new__(cls, model, input_size, metric, comparison)
+    ModelInfo = namedtuple('ModelInfo', ['model', 'input_size', 'metric', 'comparison'])
+    ModelInfo.__new__.__defaults__ = (None, )
 
 
 @unique
