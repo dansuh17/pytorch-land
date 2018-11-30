@@ -1,12 +1,11 @@
 from abc import ABC, abstractmethod
 import torch
-from torch import nn
 
 
 class Divergence(ABC):
     @staticmethod
     @abstractmethod
-    def output_activation() -> nn.Module:
+    def output_activation(x: torch.Tensor) -> torch.Tensor:
         pass
 
     @staticmethod
@@ -23,21 +22,51 @@ class Divergence(ABC):
         return -torch.mean(cls.conjugate_f(gen_t))
 
 
-class GanDivergence(Divergence):
-    @staticmethod
-    def output_activation():
-        return nn.LogSigmoid()
-
-    @staticmethod
-    def conjugate_f(t: torch.Tensor):
-        return -torch.log(1 - torch.exp(t))
-
-
 class KLDivergence(Divergence):
     @staticmethod
-    def output_activation():
-        return lambda x: x  # identity function  # TODO: make pytorch.save-able :(
+    def output_activation(x):
+        return x
 
     @staticmethod
     def conjugate_f(t: torch.Tensor):
         return torch.exp(t - 1)
+
+
+class ReverseKLDivergence(Divergence):
+    @staticmethod
+    def output_activation(x):
+        return -torch.exp(-x)
+
+    @staticmethod
+    def conjugate_f(t: torch.Tensor):
+        return -torch.log(-t) - 1
+
+
+class PearsonChiSquared(Divergence):
+    @staticmethod
+    def output_activation(x: torch.Tensor):
+        return x
+
+    @staticmethod
+    def conjugate_f(t: torch.Tensor):
+        return 0.25 * torch.pow(t, 2.0) + t
+
+
+class SquaredHellinger(Divergence):
+    @staticmethod
+    def output_activation(x: torch.Tensor):
+        return 1 + torch.exp(-x)
+
+    @staticmethod
+    def conjugate_f(t: torch.Tensor):
+        return t / (1 - t)
+
+
+class JensenShannon(Divergence):
+    @staticmethod
+    def output_activation(x: torch.Tensor):
+        return torch.log(2) - torch.log(1 + torch.exp(-x))
+
+    @staticmethod
+    def conjugate_f(t: torch.Tensor):
+        return -torch.log(2 - torch.exp(t))

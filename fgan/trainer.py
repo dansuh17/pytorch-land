@@ -6,7 +6,7 @@ import torchvision
 from datasets.img_popular import MNISTLoaderMaker
 from base_trainer import NetworkTrainer, TrainStage, ModelInfo
 from .fgan import FGanDiscriminator, FGanGenerator
-from .divergence import GanDivergence, KLDivergence
+from .divergence import JensenShannon
 
 
 class FGanTrainer(NetworkTrainer):
@@ -25,11 +25,11 @@ class FGanTrainer(NetworkTrainer):
         self.batch_size = config['batch_size']
         self.epoch = config['epoch']
 
-        self.divergence = GanDivergence()
+        self.divergence = JensenShannon()
 
         # create models
         generator = FGanGenerator(latent_dim)
-        discriminator = FGanDiscriminator(activation_func=self.divergence.output_activation())
+        discriminator = FGanDiscriminator(activation_func=self.divergence.output_activation)
         models = {
             'FGan_G': ModelInfo(
                 model=generator, input_size=g_input, metric='g_loss', comparison=operator.lt),
