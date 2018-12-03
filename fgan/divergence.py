@@ -49,7 +49,7 @@ class PearsonChiSquared(Divergence):
 
     @staticmethod
     def conjugate_f(t: torch.Tensor):
-        return 0.25 * torch.pow(t, 2.0) + t
+        return 0.25 * (t ** 2) + t
 
 
 class SquaredHellinger(Divergence):
@@ -65,7 +65,7 @@ class SquaredHellinger(Divergence):
 class JensenShannon(Divergence):
     @staticmethod
     def output_activation(x: torch.Tensor):
-        return torch.log(torch.Tensor([2])) - torch.log(1 + torch.exp(-x))
+        return torch.log(torch.Tensor([2])).to(x.device) - torch.log(1 + torch.exp(-x))
 
     @staticmethod
     def conjugate_f(t: torch.Tensor):
