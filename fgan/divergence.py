@@ -63,7 +63,7 @@ class PearsonChiSquared(Divergence):
 class SquaredHellinger(Divergence):
     @staticmethod
     def output_activation(x: torch.Tensor):
-        return 1 + torch.exp(-x)
+        return 1 - torch.exp(-x)
 
     @staticmethod
     def conjugate_f(t: torch.Tensor):
