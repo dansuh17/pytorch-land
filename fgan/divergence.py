@@ -21,6 +21,14 @@ class Divergence(ABC):
     def g_loss_func(cls, gen_t):
         return -torch.mean(cls.conjugate_f(gen_t))
 
+    @classmethod
+    def g_loss_alternative(cls, gen_t):
+        """Alternative loss formulation.
+        Instead of minimizing '- log E(f*(Tw(x)))', we maximize 'E(Tw(x))'.
+        See section 3.2 "Practical Considerations" in Nowozin et al.
+        """
+        return -torch.mean(gen_t)
+
 
 class KLDivergence(Divergence):
     @staticmethod

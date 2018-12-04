@@ -39,7 +39,7 @@ class FGanTrainer(NetworkTrainer):
         # define loss functions, as defined according to the specific f-divergence metric
         criteria = {
             'd_criteria': self.divergence.d_loss_func,
-            'g_criteria': self.divergence.g_loss_func,
+            'g_criteria': self.divergence.g_loss_alternative,
         }
 
         # set data loader maker
