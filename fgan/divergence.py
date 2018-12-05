@@ -6,12 +6,19 @@ class Divergence(ABC):
     @staticmethod
     @abstractmethod
     def output_activation(x: torch.Tensor) -> torch.Tensor:
-        pass
+        """Must provide the suggested output activation functions
+        for each divergence types.
+        See Table 2 from Nowozin et al.
+        """
+        raise NotImplementedError
 
     @staticmethod
     @abstractmethod
     def conjugate_f(t: torch.Tensor):
-        pass
+        """Must provide the 'Fenchel conjugate' function of the generator function 'f'.
+        See section 2.2 "Variational Estimation of f-divergences" in Nowozin et al.
+        """
+        raise NotImplementedError
 
     @classmethod
     def d_loss_func(cls, real_t, gen_t):
