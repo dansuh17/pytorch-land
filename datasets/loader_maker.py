@@ -16,4 +16,3 @@ class DataLoaderMaker(ABC):
     @abstractmethod
     def make_validate_dataloader(self):
         raise NotImplementedError
-

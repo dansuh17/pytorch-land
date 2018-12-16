@@ -1,3 +1,4 @@
+import torch
 from torch import nn
 
 
@@ -49,7 +50,7 @@ class UnrolledGanDiscriminator(nn.Module):
         self.apply(self.init_weights)
 
     def forward(self, x):
-        return self.net(x)
+        return torch.sigmoid(self.net(x))
 
     @staticmethod
     def init_weights(m):
