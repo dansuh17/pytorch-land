@@ -1,0 +1,9 @@
+{
+  "input_size": 256,
+  "data_dim": 2,
+  "dataset_size": 50000,
+  "batch_size": 128,
+  "epoch": 100,
+  "unroll": 0,
+  "lr_init": 0.002
+}

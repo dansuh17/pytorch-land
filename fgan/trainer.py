@@ -1,8 +1,6 @@
 import operator
-
 import torch
 import torchvision
-
 from datasets.img_popular import MNISTLoaderMaker
 from base_trainer import NetworkTrainer, TrainStage, ModelInfo
 from .fgan import FGanDiscriminator, FGanGenerator

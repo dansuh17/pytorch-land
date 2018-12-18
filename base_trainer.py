@@ -97,13 +97,11 @@ class NetworkTrainer(ABC):
         Initialize the trainer.
 
         Args:
-            model (nn.Module | tuple[nn.Module]): network model(s)
+            models (Dict[str, ModelInfo]): network model(s)
             dataloader_maker (DataLoaderMaker): instance creating dataloaders
             criterion: training criterion (a.k.a. loss function)
             optimizer (Optimizer | tuple[Optimizer]): gradient descent optimizer
             epoch: total epochs to train (the end epoch)
-            input_size (tuple[int]|tuple[tuple[int]]): size of inputs
-                - MUST match the number of models provided
             output_dir (str): root output directory
             num_devices (int): number of GPU devices to split the batch
             seed (int): random seed to use
