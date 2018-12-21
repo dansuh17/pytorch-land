@@ -166,6 +166,98 @@ class LSUNLoaderMaker(DataLoaderMaker):
         )
 
 
+class CIFAR10LoaderMaker(DataLoaderMaker):
+    """DataLoader maker for CIFAR-10 dataset.
+
+    See Also: https://www.cs.toronto.edu/~kriz/cifar.html
+    """
+    default_img_dim = 32
+
+    def __init__(self, data_root: str, batch_size: int, num_workers=4,
+                 img_dim=32, naive_normalization=False):
+        super().__init__()
+        self.num_workers = num_workers
+        self.batch_size = batch_size
+        self.num_classes = 10
+
+        # validate image size
+        if img_dim > self.default_img_dim:
+            raise ValueError(
+                'Image dimension cannot be larger than {}. Got : {}.'
+                .format(self.default_img_dim, img_dim))
+        self.img_dim = img_dim
+
+        # data normalizers
+        normalizer = transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]) \
+            if naive_normalization else \
+            transforms.Normalize(mean=[0.4914, 0.4822, 0.4465], std=[0.2023, 0.1994, 0.2010])
+
+        train_img_dir = os.path.join(data_root, 'cifar10')
+
+        trainval_transform = transforms.Compose([
+            transforms.RandomCrop(img_dim, padding=4),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            normalizer,
+        ])
+
+        test_transform = transforms.Compose([
+            transforms.CenterCrop(size=img_dim),
+            transforms.ToTensor(),
+            normalizer,
+        ])
+
+        self.train_dataset = datasets.CIFAR10(
+            root=train_img_dir,
+            train=True, download=True,
+            transform=trainval_transform)
+        self.validate_dataset = datasets.CIFAR10(
+            root=train_img_dir,
+            train=True, download=True,
+            transform=trainval_transform)
+        self.test_dataset = datasets.CIFAR10(
+            root=train_img_dir,
+            train=False, download=True,
+            transform=test_transform)
+
+        # split indices btwn. train and validation sets
+        num_data = len(self.train_dataset)
+        indices = list(range(num_data))
+        random.shuffle(indices)
+        num_train = math.floor(num_data * 0.9)
+        self.train_idx, self.validate_idx = indices[:num_train], indices[num_train:]
+
+    def make_train_dataloader(self):
+        return data.DataLoader(
+            self.train_dataset,
+            sampler=data.sampler.SubsetRandomSampler(self.train_idx),
+            pin_memory=True,
+            drop_last=True,
+            num_workers=self.num_workers,
+            batch_size=self.batch_size,
+        )
+
+    def make_validate_dataloader(self):
+        return data.DataLoader(
+            self.validate_dataset,
+            sampler=data.sampler.SubsetRandomSampler(self.validate_idx),
+            pin_memory=True,
+            drop_last=True,
+            num_workers=self.num_workers,
+            batch_size=self.batch_size,
+        )
+
+    def make_test_dataloader(self):
+        return data.DataLoader(
+            self.test_dataset,
+            shuffle=True,
+            pin_memory=True,
+            drop_last=True,
+            num_workers=self.num_workers,
+            batch_size=self.batch_size,
+        )
+
+
 # deprecated function
 def load_mnist(data_root: str, batch_size: int):
     """Creates loaders for MNIST dataset."""
