@@ -8,6 +8,8 @@ from enum import Enum, unique
 from collections import defaultdict, namedtuple
 import torch
 import torch.nn as nn
+from torch import optim
+from torch.optim import optimizer
 from torch.optim.optimizer import Optimizer
 from datasets.loader_maker import DataLoaderMaker
 from tensorboardX import SummaryWriter
@@ -141,7 +143,7 @@ class NetworkTrainer(ABC):
         # save any other states or variables to maintain
         self.total_epoch = epoch
         self.criterions = criterion
-        self.optimizers = self._make_tuple(optimizer)
+        self.optimizers = optimizer
         if lr_scheduler is not None:
             self.lr_schedulers = self._make_tuple(lr_scheduler)
         else:
@@ -247,7 +249,7 @@ class NetworkTrainer(ABC):
         Args:
             model (Dict[str, ModelInfo]): models to train
             criteria: model criteria functions
-            optimizer (Optimizer | tuple[Optimizer]): model optimizers
+            optimizer (Dict[str, nn.Optimizer]): model optimizers
             input_ (torch.Tensor | tuple[torch.Tensor]): inputs to models
             train_stage (TrainStage): enum indicating which stage of training it is going through
 
@@ -280,7 +282,7 @@ class NetworkTrainer(ABC):
             output, loss = self.run_step(
                 self.models,
                 self.criterions,
-                self._make_single_or_tuple(self.optimizers),
+                self.optimizers,
                 input_,
                 train_stage)
 
@@ -477,8 +479,11 @@ class NetworkTrainer(ABC):
         print(log)
 
     @staticmethod
-    def save_learning_rate(writer, optimizers, step: int):
-        for opt in optimizers:
+    def save_learning_rate(
+            writer,
+            optimizers: Dict[str, optimizer.Optimizer],
+            step: int):
+        for opt in optimizers.values():
             for idx, param_group in enumerate(opt.param_groups):
                 lr = param_group['lr']
                 writer.add_scalar('lr/{}'.format(idx), lr, step)

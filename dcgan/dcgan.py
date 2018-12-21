@@ -1,6 +1,6 @@
 """
-Implementation of DCGAN by Radford et al. - "Unsupervised Representation Learning with Deep Convolutional Generative Adversarial Networks
-" (2016)
+Implementation of DCGAN by Radford et al. -
+"Unsupervised Representation Learning with Deep Convolutional Generative Adversarial Networks" (2016)
 """
 import torch
 from torch import nn
