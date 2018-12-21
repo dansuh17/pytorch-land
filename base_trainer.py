@@ -364,7 +364,9 @@ class NetworkTrainer(ABC):
         for model_name in self.models:
             model_state[model_name] = self.models[model_name].model.state_dict()
 
-        optimizer_state = tuple(map(lambda m: m.state_dict(), self.optimizers))
+        optimizer_state = {}
+        for optim_name in self.optimizers:
+            optimizer_state[optim_name] = self.optimizers[optim_name].state_dict()
 
         train_state = {
             'epoch': self.epoch,
