@@ -88,7 +88,7 @@ class ACGanTrainer(NetworkTrainer):
         classes[indices, labels] = 1
 
         classes = classes.view(-1, self.num_class, 1, 1)  # make it size (b, 10, 1, 1)
-        return torch.cat([z, classes], dim=1), labels.long()
+        return torch.cat([z, classes], dim=1).to(self.device), labels.long().to(self.device)
 
     def run_step(self,
                  model: Dict[str, ModelInfo],
