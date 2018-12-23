@@ -4,7 +4,8 @@ All methods should commonly return a tuple of 4:
     1. train dataloader
     2. validation dataloader
     3. test dataloader
-    4. any miscellaneous information / data about the dataset in dict form (None if ... well, none)
+    4. any miscellaneous information / data about the dataset in dict form
+        (None if ... well, none)
 """
 import os
 import math

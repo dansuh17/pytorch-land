@@ -14,12 +14,15 @@ class ACGanGenerator(nn.Module):
                 kernel_size=4, stride=1, padding=0, bias=False),  # (512, 4, 4)
             nn.BatchNorm2d(512),
             nn.ReLU(inplace=True),
+
             nn.ConvTranspose2d(512, 256, 4, 2, 1, bias=False),  # (256, 8, 8)
             nn.BatchNorm2d(256),
             nn.ReLU(inplace=True),
+
             nn.ConvTranspose2d(256, 128, 4, 2, 1, bias=False),  # (128, 16, 16)
             nn.BatchNorm2d(128),
             nn.ReLU(inplace=True),
+
             nn.ConvTranspose2d(128, 3, 4, 2, 1, bias=False),  # (3, 32, 32)
             nn.Tanh()
         )
@@ -56,10 +59,8 @@ class ACGanDiscriminator(nn.Module):
             nn.LeakyReLU(0.2, inplace=True),
 
             nn.Conv2d(512, 1024, 4, 2, 1, bias=False),  # (1024, 4, 4)
-            nn.BatchNorm2d(1024),
-            nn.LeakyReLU(0.2, inplace=True),
         )
-        self.output_numel = 512 * 4 * 4
+        self.output_numel = 1024 * 4 * 4
 
         # separate linear layer for classification and discrimination
         self.fc_classifier = nn.Linear(self.output_numel, num_class)
