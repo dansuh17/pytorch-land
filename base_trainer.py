@@ -8,7 +8,6 @@ from enum import Enum, unique
 from collections import defaultdict, namedtuple
 import torch
 import torch.nn as nn
-from torch import optim
 from torch.optim import optimizer
 from torch.optim.optimizer import Optimizer
 from datasets.loader_maker import DataLoaderMaker

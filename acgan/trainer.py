@@ -20,12 +20,12 @@ class ACGanTrainer(NetworkTrainer):
         print('Configuration')
         print(config)
 
-        self.input_dim = 256
-        self.batch_size = 128
-        self.total_epoch = 100
-        self.display_imgs = 10
-        self.height = 32
-        self.width = 32
+        self.input_dim = config['input_dim']
+        self.batch_size = config['batch_size']
+        self.total_epoch = config['epoch']
+        self.display_imgs = config['display_imgs']
+        self.height = config['height']
+        self.width = config['width']
 
         # create data loader maker
         loader_maker = CIFAR10LoaderMaker(
@@ -43,7 +43,7 @@ class ACGanTrainer(NetworkTrainer):
             ),
             'ACGan_D': ModelInfo(
                 model=discriminator,
-                input_size=(3, 32, 32),
+                input_size=(3, self.height, self.width),
                 metric='loss_d',
             ),
         }
@@ -56,7 +56,7 @@ class ACGanTrainer(NetworkTrainer):
         }
 
         # create optimizers
-        self.lr_init = 0.0002
+        self.lr_init = config['lr_init']
         optimizers = {
             'optimizer_d': optim.Adam(
                 generator.parameters(), lr=self.lr_init, betas=(0.5, 0.999)),
@@ -183,6 +183,9 @@ class ACGanTrainer(NetworkTrainer):
 
     @staticmethod
     def make_performance_metric(input_, output, loss):
+        """
+        Indicate performance metrics to display and compare.
+        """
         return {
             'd_loss': loss[0].item(),
             'g_loss': loss[1].item(),
@@ -210,10 +213,9 @@ class ACGanTrainer(NetworkTrainer):
 
 
 if __name__ == '__main__':
-    config = {}
     import json
-    # with open('acgan/config.json', 'r') as configf:
-    #     config = json.loads(configf.read())
+    with open('acgan/config.json', 'r') as configf:
+        config = json.loads(configf.read())
 
     trainer = ACGanTrainer(config)
     trainer.fit()
