@@ -131,10 +131,10 @@ class ACGanTrainer(NetworkTrainer):
         # generate input data
         noise_input, fake_class_targets = self.make_noise_input()
 
-        valid = torch.ones((batch_size, 1)).to(self.device)
-        invalid = torch.zeros((batch_size, 1)).to(self.device)
+        valid = torch.zeros((batch_size, 1)).to(self.device)
+        invalid = torch.ones((batch_size, 1)).to(self.device)
 
-        ### train D
+        ### train D ###
         generated = generator(noise_input)
         fake_discriminated, fake_classified = discriminator(generated.detach())
         real_discriminated, real_classified = discriminator(imgs)
@@ -158,7 +158,7 @@ class ACGanTrainer(NetworkTrainer):
             d_loss.backward()
             d_optim.step()
 
-        ### train G
+        ### train G ###
         noise_input, fake_class_targets = self.make_noise_input()
         generated = generator(noise_input)
         fake_discriminated, fake_classified = discriminator(generated)

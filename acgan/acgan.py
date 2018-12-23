@@ -24,6 +24,9 @@ class ACGanGenerator(nn.Module):
             nn.Tanh()
         )
 
+        # initialize weights
+        self.apply(self.init_weights)
+
     def forward(self, x):
         return self.net(x)
 
@@ -59,6 +62,9 @@ class ACGanDiscriminator(nn.Module):
         self.fc_classifier = nn.Linear(self.output_numel, num_class)
         self.fc_discriminator = nn.Linear(self.output_numel, 1)
 
+        # initialize weights
+        self.apply(self.init_weights)
+
     def forward(self, x):
         conv_out = self.net(x)
         conv_out = conv_out.view(-1, self.output_numel)  # common convolutional layers
@@ -66,6 +72,14 @@ class ACGanDiscriminator(nn.Module):
             torch.sigmoid(self.fc_discriminator(conv_out)),  # discrimination output
             torch.log_softmax(self.fc_classifier(conv_out), dim=1),  # classification output
         )
+
+    @staticmethod
+    def init_weights(m):
+        if isinstance(m, nn.ConvTranspose2d):
+            nn.init.kaiming_uniform_(m.weight)
+        elif isinstance(m, nn.Linear):
+            nn.init.kaiming_normal_(m.weight)
+            nn.init.constant_(m.bias, 0)
 
 
 if __name__ == '__main__':
