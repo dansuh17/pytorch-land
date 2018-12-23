@@ -7,7 +7,7 @@ class ACGanGenerator(nn.Module):
     def __init__(self, input_dim: int):
         super().__init__()
         self.input_dim = input_dim  # inputs expected to have size (input_dim, 1, 1)
-        # transpose conv size : (input - 1) * stride - 2 * padding + 1
+        # transpose conv size : (input - 1) * stride - 2 * padding + kernel_size
         self.net = nn.Sequential(
             nn.ConvTranspose2d(
                 in_channels=input_dim, out_channels=512,
@@ -50,7 +50,7 @@ class ACGanDiscriminator(nn.Module):
                 kernel_size=3, stride=1, padding=1, bias=False),  # out : (128, 32, 32)
             nn.LeakyReLU(0.2, inplace=True),
 
-            nn.Conv2d(128, 256, 4, 2, 1, bias=False), # out : (256, 16, 16)
+            nn.Conv2d(128, 256, 4, 2, 1, bias=False),  # (256, 16, 16)
             nn.LeakyReLU(0.2, inplace=True),
             nn.BatchNorm2d(256),
 

@@ -150,7 +150,7 @@ class ACGanTrainer(NetworkTrainer):
         cls_loss = fake_cls_loss + real_cls_loss
 
         # total loss
-        d_loss = disc_loss + cls_loss * 10
+        d_loss = disc_loss + cls_loss
 
         # update step against the total loss
         if train_stage == TrainStage.TRAIN:
@@ -166,7 +166,7 @@ class ACGanTrainer(NetworkTrainer):
         # calculate total loss
         disc_loss = g_criteria(fake_discriminated, valid)
         cls_loss = classification_criteria(fake_classified, fake_class_targets)
-        g_loss = disc_loss + cls_loss * 10
+        g_loss = disc_loss + cls_loss
 
         if train_stage == TrainStage.TRAIN:
             g_optim.zero_grad()
