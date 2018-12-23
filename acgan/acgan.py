@@ -44,16 +44,19 @@ class ACGanDiscriminator(nn.Module):
         self.net = nn.Sequential(
             nn.Conv2d(
                 in_channels=3, out_channels=128,
-                kernel_size=4, stride=2, padding=1, bias=False),  # out : (128, 16, 16)
+                kernel_size=3, stride=1, padding=1, bias=False),  # out : (128, 32, 32)
             nn.LeakyReLU(0.2, inplace=True),
 
-            nn.Conv2d(128, 256, 4, 2, 1),  # (256, 8, 8)
+            nn.Conv2d(128, 256, 4, 2, 1, bias=False), # out : (256, 16, 16)
+            nn.LeakyReLU(0.2, inplace=True),
             nn.BatchNorm2d(256),
-            nn.LeakyReLU(0.2, inplace=True),
-            nn.Dropout(p=0.5),
 
-            nn.Conv2d(256, 512, 4, 2, 1),  # (512, 4, 4)
+            nn.Conv2d(256, 512, 4, 2, 1, bias=False),  # (512, 8, 8)
             nn.BatchNorm2d(512),
+            nn.LeakyReLU(0.2, inplace=True),
+
+            nn.Conv2d(512, 1024, 4, 2, 1, bias=False),  # (1024, 4, 4)
+            nn.BatchNorm2d(1024),
             nn.LeakyReLU(0.2, inplace=True),
         )
         self.output_numel = 512 * 4 * 4
