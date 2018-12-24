@@ -50,18 +50,18 @@ class ACGanTrainer(NetworkTrainer):
 
         # create criteria
         criteria = {
-            'd_criteria': nn.BCELoss(),
             'g_criteria': nn.BCELoss(),
-            'classification_loss': nn.NLLLoss(),
+            'd_criteria': nn.BCELoss(),
+            'classification_loss': nn.NLLLoss(),  # assumes log-softmaxed values from discriminator
         }
 
         # create optimizers
         self.lr_init = config['lr_init']
         optimizers = {
-            'optimizer_d': optim.Adam(
-                discriminator.parameters(), lr=self.lr_init, betas=(0.5, 0.999)),
             'optimizer_g': optim.Adam(
                 generator.parameters(), lr=self.lr_init, betas=(0.5, 0.999)),
+            'optimizer_d': optim.Adam(
+                discriminator.parameters(), lr=self.lr_init, betas=(0.5, 0.999)),
         }
 
         # create the trainer instance
@@ -131,21 +131,23 @@ class ACGanTrainer(NetworkTrainer):
         # generate input data
         noise_input, fake_class_targets = self.make_noise_input()
 
-        valid = torch.zeros((batch_size, 1)).to(self.device)
-        invalid = torch.ones((batch_size, 1)).to(self.device)
+        valid = torch.ones((batch_size, 1)).to(self.device)
+        invalid = torch.zeros((batch_size, 1)).to(self.device)
 
+        ###############
         ### train D ###
+        ###############
         generated = generator(noise_input)
         fake_discriminated, fake_classified = discriminator(generated.detach())
         real_discriminated, real_classified = discriminator(imgs)
 
         # calculate discrimination loss
-        fake_disc_loss = d_criteria(fake_discriminated, invalid)
+        fake_disc_loss = d_criteria(fake_discriminated, invalid)  # BCE loss
         real_disc_loss = d_criteria(real_discriminated, valid)
         disc_loss = fake_disc_loss + real_disc_loss
 
         # calculate classification loss
-        fake_cls_loss = classification_criteria(fake_classified, fake_class_targets)
+        fake_cls_loss = classification_criteria(fake_classified, fake_class_targets)  # NLL loss
         real_cls_loss = classification_criteria(real_classified, real_class_targets)
         cls_loss = fake_cls_loss + real_cls_loss
 
@@ -158,15 +160,17 @@ class ACGanTrainer(NetworkTrainer):
             d_loss.backward()
             d_optim.step()
 
+        ###############
         ### train G ###
+        ###############
         noise_input, fake_class_targets = self.make_noise_input()
         generated = generator(noise_input)
         fake_discriminated, fake_classified = discriminator(generated)
 
         # calculate total loss
-        disc_loss = g_criteria(fake_discriminated, valid)
-        cls_loss = classification_criteria(fake_classified, fake_class_targets)
-        g_loss = disc_loss + cls_loss
+        gen_disc_loss = g_criteria(fake_discriminated, valid)
+        gen_cls_loss = classification_criteria(fake_classified, fake_class_targets)
+        g_loss = gen_disc_loss + gen_cls_loss
 
         if train_stage == TrainStage.TRAIN:
             g_optim.zero_grad()
@@ -178,7 +182,16 @@ class ACGanTrainer(NetworkTrainer):
             generated,
             imgs,  # real images
         )
-        losses = (d_loss, g_loss, disc_loss, cls_loss)
+        losses = (
+            d_loss,
+            g_loss,
+            fake_disc_loss,
+            real_disc_loss,
+            fake_cls_loss,
+            real_cls_loss,
+            gen_disc_loss,
+            gen_cls_loss
+        )
         return outputs, losses
 
     @staticmethod
@@ -189,8 +202,12 @@ class ACGanTrainer(NetworkTrainer):
         return {
             'd_loss': loss[0].item(),
             'g_loss': loss[1].item(),
-            'disc_loss': loss[2].item(),
-            'cls_loss': loss[3].item(),
+            'fake_disc_loss': loss[2].item(),
+            'real_disc_loss': loss[3].item(),
+            'fake_cls_loss': loss[4].item(),
+            'real_cls_loss': loss[5].item(),
+            'gen_disc_loss': loss[6].item(),
+            'gen_cls_loss': loss[7].item(),
         }
 
     def pre_epoch_finish(self, input, output, metric_manager, train_stage: TrainStage):

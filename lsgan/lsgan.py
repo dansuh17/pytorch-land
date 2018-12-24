@@ -51,13 +51,46 @@ class LSGanGenerator(nn.Module):
         x = x.view(-1, *self.conv_input)
         return self.conv_layers(x)
 
+    @staticmethod
+    def init_weights(m):
+        if isinstance(m, nn.ConvTranspose2d):
+            nn.init.kaiming_uniform_(m.weight)
+
 
 class LSGanDiscriminator(nn.Module):
     def __init__(self):
         super().__init__()
+        # in : (b, 3, 64, 64)
+        self.net = nn.Sequential(
+            nn.Conv2d(
+                in_channels=3, out_channels=64,
+                kernel_size=5, stride=2, padding=2, bias=False),  # (b, 64, 32, 32)
+            nn.LeakyReLU(0.2, inplace=True),
+
+            nn.Conv2d(64, 128, 5, 2, padding=2, bias=False),  # (b, 128, 16, 16)
+            nn.BatchNorm2d(128),
+            nn.LeakyReLU(0.2, inplace=True),
+
+            nn.Conv2d(128, 256, 5, 2, padding=2, bias=False),  # (b, 256, 8, 8)
+            nn.BatchNorm2d(256),
+            nn.LeakyReLU(0.2, inplace=True),
+
+            nn.Conv2d(256, 512, 5, 2, padding=2, bias=False),  # (b, 512, 4, 4)
+        )
+        self.conv_output_size = 512 * 4 * 4
+        self.linear = nn.Linear(in_features=self.conv_output_size, out_features=1)
 
     def forward(self, x):
-        pass
+        x = self.net(x)
+        return self.linear(x.view(-1, self.conv_output_size))
+
+    @staticmethod
+    def init_weights(m):
+        if isinstance(m, nn.ConvTranspose2d):
+            nn.init.kaiming_uniform_(m.weight)
+        elif isinstance(m, nn.Linear):
+            nn.init.kaiming_normal_(m.weight)
+            nn.init.constant_(m.bias, 0)
 
 
 if __name__ == '__main__':
@@ -68,7 +101,7 @@ if __name__ == '__main__':
     gen = generator(noise)
     print(gen.size())
 
-    # print('Discriminator output size')
-    # discriminator = LSGanDiscriminator()
-    # disc = discriminator(gen)
-    # print(disc.size())
+    print('Discriminator output size')
+    discriminator = LSGanDiscriminator()
+    disc = discriminator(gen)
+    print(disc.size())

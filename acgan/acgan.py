@@ -53,6 +53,7 @@ class ACGanDiscriminator(nn.Module):
             nn.Conv2d(128, 256, 4, 2, 1, bias=False),  # (256, 16, 16)
             nn.LeakyReLU(0.2, inplace=True),
             nn.BatchNorm2d(256),
+            nn.Dropout(p=0.5),
 
             nn.Conv2d(256, 512, 4, 2, 1, bias=False),  # (512, 8, 8)
             nn.BatchNorm2d(512),
