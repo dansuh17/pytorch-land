@@ -24,7 +24,7 @@ class ACGanGenerator(nn.Module):
             nn.ReLU(inplace=True),
 
             nn.ConvTranspose2d(128, 3, 4, 2, 1, bias=False),  # (3, 32, 32)
-            nn.Tanh()
+            nn.Tanh(),
         )
 
         # initialize weights
