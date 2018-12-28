@@ -227,6 +227,37 @@ def split_and_save_clean_noise_pair(
                 np.asarray(split_pair))
 
 
+def noisy_custom_vctk_preprocess(
+        in_path: str, out_path: str, clean_dir: str, noisy_dir: str,
+        target_sr=16000, window_size=256, hop_size: int=None, split_size=11, mel=True):
+    """
+    TODO: temporary function for processing custom-made noisy dataset
+    """
+    if hop_size is None:
+        hop_size = window_size // 2  # 0.5 hop by default
+
+    clean_data_path = os.path.join(in_path, clean_dir)
+    print('Preprocessing : {} and {}'.format(clean_dir, noisy_dir))
+
+    # create data output path
+    if not os.path.exists(out_path):
+        os.makedirs(out_path, exist_ok=True)
+
+    for fname in tqdm(os.listdir(clean_data_path), ascii=True):
+        # parse the file name that should have form : 'p125_111.wav'
+        full_path = os.path.join(in_path, clean_dir, fname)
+
+        # also read the noisy audio as well
+        noisy_counterpart_path = os.path.join(in_path, noisy_dir, fname)
+
+        # split spectrograms and save clean / noise pairs
+        split_and_save_clean_noise_pair(
+            full_path, noisy_counterpart_path,
+            sr=target_sr, window_size=window_size,
+            hop_size=hop_size, split_size=split_size,
+            out_dir=out_path, mel=mel)
+
+
 class NoisyVCTKSpectrogram(Dataset):
     """
     Dataset for VCTK dataset that has been preprocessed into mel-spectrogram chunks.
@@ -244,11 +275,9 @@ class NoisyVCTKSpectrogram(Dataset):
         self.use_db_spec = use_db_spec
 
         data = []
-        for speaker_id in os.listdir(data_path):
-            speaker_data_dir = os.path.join(data_path, speaker_id)
-            for fname in os.listdir(speaker_data_dir):
-                # append data path into the list of all audio data
-                data.append(os.path.join(speaker_data_dir, fname))
+        for root, _, files in os.walk(data_path):
+            for fname in files:
+                data.append(os.path.join(root, fname))
         self.data = data
 
     def __getitem__(self, idx):
