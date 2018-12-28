@@ -1,4 +1,5 @@
 import os
+from typing import Dict
 import librosa
 import numpy as np
 import torch
@@ -7,7 +8,7 @@ import torch.optim as optim
 import torchvision
 from .schmidt_sda import SchmidtSDA
 from .dae_unet import DansuhDenoisingCNN
-from base_trainer import NetworkTrainer, TrainStage
+from base_trainer import NetworkTrainer, TrainStage, ModelInfo
 from utils.spectrogram import denormalize_db_spectrogram
 
 
@@ -19,34 +20,59 @@ class DansuhNetTrainer(NetworkTrainer):
         self.input_height = config['input_width']
         self.input_width = config['input_height']
         self.lr_init = config['lr_init']
+        self.total_epoch = config['epoch']
         batch_size = config['batch_size']
         input_data_dir = config['data_dir']
 
         model = DansuhDenoisingCNN()
-        dataloader_maker = VCTKLoaderMaker(input_data_dir, batch_size, use_channel=True, use_db_spec=True)
+        models = {
+            'DansuhNet': ModelInfo(
+                model=model,
+                input_size=(3, self.input_height, self.input_width),
+                metric='loss',
+            )
+        }
+
+        dataloader_maker = VCTKLoaderMaker(
+            input_data_dir, batch_size, use_channel=True, use_db_spec=True)
+
         # mean squared error loss
-        criterion = nn.MSELoss(reduction='elementwise_mean')
-        optimizer = optim.Adam(params=model.parameters(),
-                               lr=self.lr_init)
+        criterion = {
+            'mse_loss': nn.MSELoss(reduction='elementwise_mean')
+        }
+
+        optimizer = {
+            'adam': optim.Adam(
+                params=model.parameters(), lr=self.lr_init),
+        }
+
         lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer, mode='min', verbose=True, factor=0.2, patience=7)
+            optimizer['adam'], mode='min', verbose=True, factor=0.2, patience=7)
+
         # initialize the trainer
-        super().__init__(model, dataloader_maker, criterion, optimizer,
-                         epoch=config['epoch'],
-                         input_size=(self.input_channel, self.input_height, self.input_width),
-                         num_devices=config['num_devices'],
-                         lr_scheduler=lr_scheduler)
+        super().__init__(
+            models, dataloader_maker, criterion, optimizer,
+            epoch=self.total_epoch, lr_scheduler=lr_scheduler)
 
-    def run_step(self, model, criteria, optimizer, input_, train_stage: TrainStage, *args, **kwargs):
+    def run_step(self,
+                 model: Dict[str, ModelInfo],
+                 criteria,
+                 optimizer,
+                 input_,
+                 train_stage: TrainStage,
+                 *args, **kwargs):
+        dansuh_net = model['DansuhNet'].model
+
         clean_img, noisy_img = input_
-        output = model(noisy_img)
-        loss = criteria(output, clean_img)
+        output = dansuh_net(noisy_img)
+        loss = criteria['mse_loss'](output, clean_img)
 
+        opt = optimizer['adam']
         # update the model if training
         if train_stage == TrainStage.TRAIN:
-            optimizer.zero_grad()
+            opt.zero_grad()
             loss.backward()
-            optimizer.step()
+            opt.step()
         return output, loss
 
     @staticmethod
@@ -56,13 +82,13 @@ class DansuhNetTrainer(NetworkTrainer):
         return clean_img, noisy_img
 
     def pre_epoch_finish(self, input, output, metric_manager, train_stage):
-        super().pre_epoch_finish(input, output, metric_manager, train_stage)
-        # expand variables just to read easily
-        clean_imgs, noisy_imgs = input
-        nrow = 6
-        self.add_image(clean_imgs, nrow, height=self.input_height, width=self.input_width, name='clean')
-        self.add_image(noisy_imgs, nrow, height=self.input_height, width=self.input_width, name='noisy')
-        self.add_image(output, nrow, height=self.input_height, width=self.input_width, name='denoised')
+        if train_stage == TrainStage.VALIDATE:
+            # expand variables just to read easily
+            clean_imgs, noisy_imgs = input
+            nrow = 6
+            self.add_image(clean_imgs, nrow, height=self.input_height, width=self.input_width, name='clean')
+            self.add_image(noisy_imgs, nrow, height=self.input_height, width=self.input_width, name='noisy')
+            self.add_image(output, nrow, height=self.input_height, width=self.input_width, name='denoised')
 
     def add_image(self, img, nrow, height, width, name: str):
         spec = self.make_grid_from_mel(img[:nrow, :].view(-1, 1, height, width))
@@ -130,14 +156,15 @@ class SchmidtSDATrainer(NetworkTrainer):
                          num_devices=config['num_devices'],
                          lr_scheduler=lr_scheduler)
 
-    def forward(self, model, input, *args, **kwargs):
-        return model(input[1])  # feed noisy image to the model
-
     @staticmethod
     def input_transform(data):
         clean_img = data[0].float()
         noisy_img = data[1].float()
         return clean_img, noisy_img
+
+    @staticmethod
+    def make_performance_metric(input_, output, loss):
+        pass
 
     @staticmethod
     def criterion_input_maker(input, output, *args, **kwargs):
@@ -146,14 +173,14 @@ class SchmidtSDATrainer(NetworkTrainer):
         return output_img, clean_img
 
     def pre_epoch_finish(self, input, output, metric_manager, train_stage):
-        super().pre_epoch_finish(input, output, metric_manager, train_stage)
-        # expand variables just to read easily
-        clean_imgs, noisy_imgs = input
-        denoised_img, _ = output
-        nrow = 4
-        self.add_image(clean_imgs, nrow, height=self.input_height, width=self.input_width, name='clean')
-        self.add_image(noisy_imgs, nrow, height=self.input_height, width=self.input_width, name='noisy')
-        self.add_image(denoised_img, nrow, height=self.input_height, width=self.input_width, name='denoised')
+        if train_stage == TrainStage.VALIDATE:
+            # expand variables just to read easily
+            clean_imgs, noisy_imgs = input
+            denoised_img, _ = output
+            nrow = 4
+            self.add_image(clean_imgs, nrow, height=self.input_height, width=self.input_width, name='clean')
+            self.add_image(noisy_imgs, nrow, height=self.input_height, width=self.input_width, name='noisy')
+            self.add_image(denoised_img, nrow, height=self.input_height, width=self.input_width, name='denoised')
 
     def add_image(self, img, nrow, height, width, name: str):
         spec = self.make_grid_from_mel(img[:nrow, :].view(-1, 1, height, width))
