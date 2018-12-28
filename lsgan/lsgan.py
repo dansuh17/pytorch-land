@@ -47,6 +47,8 @@ class LSGanGenerator(nn.Module):
             nn.Tanh(),
         )
 
+        self.apply(self.init_weights)
+
     def forward(self, x):
         x = self.linear_layer(x)
         x = x.view(-1, *self.conv_input)
@@ -84,6 +86,8 @@ class LSGanDiscriminator(nn.Module):
         )
         self.conv_output_size = 512 * 4 * 4
         self.linear = nn.Linear(in_features=self.conv_output_size, out_features=1)
+
+        self.apply(self.init_weights)
 
     def forward(self, x):
         x = self.net(x)

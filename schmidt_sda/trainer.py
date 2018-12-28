@@ -28,7 +28,7 @@ class DansuhNetTrainer(NetworkTrainer):
         models = {
             'DansuhNet': ModelInfo(
                 model=model,
-                input_size=(3, self.input_height, self.input_width),
+                input_size=(1, self.input_height, self.input_width),
                 metric='loss',
             )
         }
