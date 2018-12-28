@@ -53,8 +53,10 @@ class LSGANTrainer(NetworkTrainer):
         # create optimizers
         self.lr_init = config['lr_init']
         optimizers = {
-            'g_optim': optim.Adam(generator.parameters(), lr=self.lr_init, betas=(0.5, 0.999)),
-            'd_optim': optim.Adam(discriminator.parameters(), lr=self.lr_init, betas=(0.5, 0.999))
+            'g_optim': optim.Adam(
+                generator.parameters(), lr=self.lr_init, betas=(0.5, 0.999)),
+            'd_optim': optim.Adam(
+                discriminator.parameters(), lr=self.lr_init, betas=(0.5, 0.999))
         }
 
         super().__init__(
@@ -79,8 +81,8 @@ class LSGANTrainer(NetworkTrainer):
         g_criteria, d_criteria = criteria['g_criteria'], criteria['d_criteria']
         g_optim, d_optim = optimizer['g_optim'], optimizer['d_optim']
 
-        valid = torch.ones((self.batch_size, 1)).to(self.device)
-        invalid = torch.zeros((self.batch_size, 1)).to(self.device)
+        valid = torch.zeros((self.batch_size, 1)).to(self.device)
+        invalid = torch.ones((self.batch_size, 1)).to(self.device)
 
         ###############
         ### train D ###
