@@ -106,4 +106,10 @@ if __name__ == '__main__':
     print('Discriminator output size')
     discriminator = LSGanDiscriminator()
     disc = discriminator(gen)
+    print(disc)
     print(disc.size())
+
+    loss = nn.MSELoss()
+    valid = torch.zeros((10, 1))
+    print(loss(disc, valid) * 0.5)
+    print(loss(disc, torch.ones((10, 1))) * 0.5 + loss(disc, valid) * 0.5)

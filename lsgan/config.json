@@ -1,0 +1,7 @@
+{
+  "batch_size": 128,
+  "input_dim": 256,
+  "epoch": 100,
+  "display_imgs": 10,
+  "lr_init": 0.0002
+}

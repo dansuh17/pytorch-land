@@ -20,10 +20,10 @@ class LSGANTrainer(NetworkTrainer):
         print(config)
 
         # parse configs
-        self.batch_size = 128
-        self.input_dim = 256
-        self.total_epoch = 100
-        self.display_imgs = 10
+        self.batch_size = config['batch_size']
+        self.input_dim = config['input_dim']
+        self.total_epoch = config['epoch']
+        self.display_imgs = config['display_imgs']
 
         # create a loader maker
         loader_maker = LSUNLoaderMaker(data_root='data_in', batch_size=self.batch_size)
@@ -51,7 +51,7 @@ class LSGANTrainer(NetworkTrainer):
         }
 
         # create optimizers
-        self.lr_init = 0.0002
+        self.lr_init = config['lr_init']
         optimizers = {
             'g_optim': optim.Adam(generator.parameters(), lr=self.lr_init, betas=(0.5, 0.999)),
             'd_optim': optim.Adam(discriminator.parameters(), lr=self.lr_init, betas=(0.5, 0.999))
@@ -80,7 +80,7 @@ class LSGANTrainer(NetworkTrainer):
         g_optim, d_optim = optimizer['g_optim'], optimizer['d_optim']
 
         valid = torch.ones((self.batch_size, 1)).to(self.device)
-        invalid = torch.zeros((self.batch_size, 0)).to(self.device)
+        invalid = torch.zeros((self.batch_size, 1)).to(self.device)
 
         ###############
         ### train D ###
@@ -88,11 +88,12 @@ class LSGANTrainer(NetworkTrainer):
         noise_vec = torch.randn((self.batch_size, self.input_dim))
 
         # loss function - refer to eq(9) on original paper
-        disc_fake = discriminator(generator(noise_vec).detach())
         disc_true = discriminator(imgs)
-        loss_fake = d_criteria(disc_fake, invalid)  # D wants generated imgs to be labeled 0
-        loss_true = d_criteria(disc_true, valid)  # D wants real imgs to be labeled 1
-        loss_d = 0.5 * loss_fake + 0.5 * loss_true
+        disc_fake = discriminator(generator(noise_vec).detach())
+
+        loss_true = 0.5 * d_criteria(disc_true, valid)  # D wants real imgs to be labeled 1
+        loss_fake = 0.5 * d_criteria(disc_fake, invalid)  # D wants generated imgs to be labeled 0
+        loss_d = loss_fake + loss_true
 
         if train_stage == TrainStage.TRAIN:
             d_optim.zero_grad()
@@ -160,10 +161,10 @@ class LSGANTrainer(NetworkTrainer):
 
 
 if __name__ == '__main__':
-    # import json
-    # with open('lsgan/config.json', 'r') as configf:
-    #     config = json.loads(configf.read())
+    import json
+    with open('lsgan/config.json', 'r') as configf:
+        config = json.loads(configf.read())
 
-    trainer = LSGANTrainer({})
+    trainer = LSGANTrainer(config)
     trainer.fit()
     trainer.cleanup()
