@@ -68,14 +68,17 @@ class LSGanDiscriminator(nn.Module):
                 in_channels=3, out_channels=64,
                 kernel_size=5, stride=2, padding=2, bias=False),  # (b, 64, 32, 32)
             nn.LeakyReLU(0.2, inplace=True),
+            nn.Dropout(p=0.5),
 
             nn.Conv2d(64, 128, 5, 2, padding=2, bias=False),  # (b, 128, 16, 16)
             nn.BatchNorm2d(128),
             nn.LeakyReLU(0.2, inplace=True),
+            nn.Dropout(p=0.5),
 
             nn.Conv2d(128, 256, 5, 2, padding=2, bias=False),  # (b, 256, 8, 8)
             nn.BatchNorm2d(256),
             nn.LeakyReLU(0.2, inplace=True),
+            nn.Dropout(p=0.5),
 
             nn.Conv2d(256, 512, 5, 2, padding=2, bias=False),  # (b, 512, 4, 4)
         )
