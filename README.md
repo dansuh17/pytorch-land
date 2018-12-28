@@ -23,7 +23,7 @@ More models to be added, and improvements on `NetworkTrainer` is under way.
 - InfoGAN (2016) [[paper](https://arxiv.org/pdf/1606.03657.pdf)] [[code](https://github.com/deNsuh/pytorch-land/tree/master/infogan)]
 - f-GAN (2016) [[paper](https://arxiv.org/abs/1606.00709)] [[code](https://github.com/deNsuh/pytorch-land/tree/master/fgan)]
 - UnrolledGAN (2016) [[paper](https://arxiv.org/abs/1611.02163)] [[code](https://github.com/deNsuh/pytorch-land/tree/master/unrolled_gan)] [[train-examples](https://github.com/deNsuh/pytorch-land/blob/master/unrolled_gan/unrolledgan_train_results.ipynb)]
-- ACGAN (2016) [[paper](https://arxiv.org/abs/1610.09585)] [[code](https://github.com/deNsuh/pytorch-land/tree/master/acgan)]
+- ACGAN (2016) [[paper](https://arxiv.org/abs/1610.09585)] [[code](https://github.com/deNsuh/pytorch-land/tree/master/acgan)] [[train-examples](https://github.com/deNsuh/pytorch-land/tree/master/acgan)]
 
 ### Autoencoders
 - Stacked Denoising Autoencoders [[paper](https://www.iro.umontreal.ca/~vincentp/Publications/denoising_autoencoders_tr1316.pdf)] [[code](https://github.com/deNsuh/pytorch-land/tree/master/sdae)]

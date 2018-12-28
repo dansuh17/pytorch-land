@@ -3,6 +3,7 @@ from torch import nn
 
 
 class LSGanGenerator(nn.Module):
+    """Least Squares GAN generator module."""
     def __init__(self, noise_dim: int):
         super().__init__()
         self.linear_out = 7 * 7 * 256
@@ -58,6 +59,7 @@ class LSGanGenerator(nn.Module):
 
 
 class LSGanDiscriminator(nn.Module):
+    """Least Squares GAN discriminator module."""
     def __init__(self):
         super().__init__()
         # in : (b, 3, 64, 64)
