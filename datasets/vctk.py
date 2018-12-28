@@ -172,7 +172,7 @@ def noisy_vctk_preprocess(
     print('Preprocessing : {} and {}'.format(clean_dir, noisy_dir))
     for fname in tqdm(os.listdir(clean_data_path), ascii=True):
         # parse the file name that should have form : 'p125_111.wav'
-        re_match = re.match(r'p(?P<class_num>\d+)_(?P<wav_id>\d+)\.wav', fname)
+        re_match = re.match(r'p(?P<class_num>\d+)_(?P<wav_id>\d+).*\.wav', fname)
         class_num = re_match.group('class_num')
         out_dir = os.path.join(out_path, class_num)
         os.makedirs(out_dir, exist_ok=True)
@@ -182,35 +182,49 @@ def noisy_vctk_preprocess(
         # also read the noisy audio as well
         noisy_counterpart_path = os.path.join(in_path, noisy_dir, fname)
 
-        # read the audio file
-        clean_y, clean_sr = librosa.load(full_path, sr=target_sr)  # resample as it reads
-        noisy_y, noisy_sr = librosa.load(noisy_counterpart_path, sr=target_sr)
+        # split spectrograms and save clean / noise pairs
+        split_and_save_clean_noise_pair(
+            full_path, noisy_counterpart_path,
+            sr=target_sr, window_size=window_size,
+            hop_size=hop_size, split_size=split_size,
+            out_dir=out_dir, mel=mel)
 
-        # create mel-spectrogram. perform stft otherwise
-        if mel:
-            # shape=(n_mels, t)
-            clean_spec = librosa.feature.melspectrogram(
-                clean_y, sr=target_sr, n_fft=window_size, hop_length=hop_size, n_mels=N_MELS)
-            noisy_spec = librosa.feature.melspectrogram(
-                noisy_y, sr=target_sr, n_fft=window_size, hop_length=hop_size, n_mels=N_MELS)
-        else:
-            # shape=(n_fft // 2 + 1, t)
-            if clean_sr != target_sr:
-                clean_y = librosa.core.resample(clean_y, clean_sr, target_sr)
-            clean_spec = librosa.core.stft(clean_y, n_fft=window_size, hop_length=hop_size)
-            if noisy_sr != target_sr:
-                noisy_y = librosa.core.resample(noisy_y, clean_sr, target_sr)
-            noisy_spec = librosa.core.stft(noisy_y, n_fft=window_size, hop_length=hop_size)
 
-        # split the spectrogram by 'split_size'-frames-sized chunks
-        clean_split = split_spectrogram(clean_spec, chunk_size_in_frames=split_size)
-        noisy_split = split_spectrogram(noisy_spec, chunk_size_in_frames=split_size)
+def split_and_save_clean_noise_pair(
+        clean_path, noisy_path, sr: int, window_size: int,
+        hop_size: int, split_size: int, out_dir: str, mel=True):
+    # read the audio file
+    clean_y, clean_sr = librosa.load(clean_path, sr=sr)  # resample as it reads
+    noisy_y, noisy_sr = librosa.load(noisy_path, sr=sr)
 
-        # save each clean-noisy pairs of chunks to file
-        for split_id, split_pair in enumerate(zip(clean_split, noisy_split)):
-            out_fname = '{}_s{:04}'.format(wav_id, split_id)
-            np.save(os.path.join(out_dir, out_fname),
-                    np.asarray(split_pair))
+    assert(len(clean_y) == len(noisy_y))
+
+    # create mel-spectrogram. perform stft otherwise
+    if mel:
+        # shape=(n_mels, t)
+        clean_spec = librosa.feature.melspectrogram(
+            clean_y, sr=sr, n_fft=window_size, hop_length=hop_size, n_mels=N_MELS)
+        noisy_spec = librosa.feature.melspectrogram(
+            noisy_y, sr=sr, n_fft=window_size, hop_length=hop_size, n_mels=N_MELS)
+    else:
+        # shape=(n_fft // 2 + 1, t)
+        if clean_sr != sr:
+            clean_y = librosa.core.resample(clean_y, clean_sr, sr)
+        clean_spec = librosa.core.stft(clean_y, n_fft=window_size, hop_length=hop_size)
+        if noisy_sr != sr:
+            noisy_y = librosa.core.resample(noisy_y, clean_sr, sr)
+        noisy_spec = librosa.core.stft(noisy_y, n_fft=window_size, hop_length=hop_size)
+
+    # split the spectrogram by 'split_size'-frames-sized chunks
+    clean_split = split_spectrogram(clean_spec, chunk_size_in_frames=split_size)
+    noisy_split = split_spectrogram(noisy_spec, chunk_size_in_frames=split_size)
+
+    # save each clean-noisy pairs of chunks to file
+    fname = os.path.splitext(os.path.basename(clean_path))[0]
+    for split_id, split_pair in enumerate(zip(clean_split, noisy_split)):
+        out_fname = '{}_s{:04}'.format(fname, split_id)
+        np.save(os.path.join(out_dir, out_fname),
+                np.asarray(split_pair))
 
 
 class NoisyVCTKSpectrogram(Dataset):
@@ -304,8 +318,6 @@ def preprocess():
 
 if __name__ == '__main__':
     preprocess()
-
-    librosa.power_to_db
 
     # # uncomment this for extracting local test set
     # noisy_vctk_preprocess(
