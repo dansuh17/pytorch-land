@@ -60,7 +60,7 @@ class LSGANTrainer(NetworkTrainer):
         }
 
         super().__init__(
-            models, loader_maker, criteria, optimizers, epoch=self.total_epoch)
+            models, loader_maker, criteria, optimizers, epoch=self.total_epoch, num_devices=4)
 
         self.epoch = 0
 
@@ -81,26 +81,8 @@ class LSGANTrainer(NetworkTrainer):
         g_criteria, d_criteria = criteria['g_criteria'], criteria['d_criteria']
         g_optim, d_optim = optimizer['g_optim'], optimizer['d_optim']
 
-        valid = torch.zeros((self.batch_size, 1)).to(self.device)
-        invalid = torch.ones((self.batch_size, 1)).to(self.device)
-
-        ###############
-        ### train D ###
-        ###############
-        noise_vec = torch.randn((self.batch_size, self.input_dim))
-
-        # loss function - refer to eq(9) on original paper
-        disc_true = discriminator(imgs)
-        disc_fake = discriminator(generator(noise_vec).detach())
-
-        loss_true = 0.5 * d_criteria(disc_true, valid)  # D wants real imgs to be labeled 1
-        loss_fake = 0.5 * d_criteria(disc_fake, invalid)  # D wants generated imgs to be labeled 0
-        loss_d = loss_fake + loss_true
-
-        if train_stage == TrainStage.TRAIN:
-            d_optim.zero_grad()
-            loss_d.backward()
-            d_optim.step()
+        valid = torch.ones((self.batch_size, 1)).to(self.device)
+        invalid = torch.zeros((self.batch_size, 1)).to(self.device)
 
         ###############
         ### train G ###
@@ -114,6 +96,24 @@ class LSGANTrainer(NetworkTrainer):
             g_optim.zero_grad()
             loss_g.backward()
             g_optim.step()
+
+        ###############
+        ### train D ###
+        ###############
+        noise_vec = torch.randn((self.batch_size, self.input_dim))
+
+        # loss function - refer to eq(9) on original paper
+        disc_true = discriminator(imgs)
+        disc_fake = discriminator(generator(noise_vec).detach())
+
+        loss_true = d_criteria(disc_true, valid)  # D wants real imgs to be labeled 1
+        loss_fake = d_criteria(disc_fake, invalid)  # D wants generated imgs to be labeled 0
+        loss_d = 0.5 * (loss_fake + loss_true)
+
+        if train_stage == TrainStage.TRAIN:
+            d_optim.zero_grad()
+            loss_d.backward()
+            d_optim.step()
 
         # collect outputs as return values
         outputs = (
