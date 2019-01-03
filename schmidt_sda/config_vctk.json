@@ -1,6 +1,6 @@
 {
   "model_name": "dansuh",
-  "data_dir": "schmidt_sda_data_in/vctk_processed",
+  "data_dir": "dansuhnet_data_in/noisy_custom_vctk",
   "batch_size": 128,
   "num_devices": 4,
   "epoch": 600,
