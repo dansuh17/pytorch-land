@@ -303,14 +303,18 @@ class NetworkTrainer(ABC):
         return metric_manager
 
     def test(self):
-        return self._run_epoch(self.test_dataloader, TrainStage.TEST)
+        with torch.no_grad():
+            results = self._run_epoch(self.test_dataloader, TrainStage.TEST)
+        return results
 
     def train(self):
         # train (model update)
         return self._run_epoch(self.train_dataloader, TrainStage.TRAIN)
 
     def validate(self):
-        return self._run_epoch(self.val_dataloader, TrainStage.VALIDATE)
+        with torch.no_grad():
+            results = self._run_epoch(self.val_dataloader, TrainStage.VALIDATE)
+        return results
 
     def _register_model(self, model: nn.Module):
         return torch.nn.parallel.DataParallel(
