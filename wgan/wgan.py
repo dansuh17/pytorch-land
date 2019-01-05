@@ -71,7 +71,6 @@ class WGANDiscriminator(nn.Module):
             nn.LeakyReLU(0.2, inplace=True),
 
             nn.Conv2d(512, 1, 4, 1, 0, bias=False),  # (1, 1, 1)
-            nn.Sigmoid(),
         )
 
         self.apply(self.init_weights)

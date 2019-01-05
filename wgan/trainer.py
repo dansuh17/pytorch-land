@@ -76,12 +76,12 @@ class WGANTrainer(NetworkTrainer):
         g_optim, d_optim = optimizer['g_optim'], optimizer['d_optim']
 
         ones = torch.ones((self.batch_size, 1)).to(self.device)
-        minus_ones = torch.zeros((self.batch_size, 1)).to(self.device)
+        minus_ones = ones * -1.0
 
         ###############
         ### train G ###
         ###############
-        noise_vec = torch.randn((self.batch_size, self.input_dim))
+        noise_vec = torch.randn((self.batch_size, self.input_dim, 1, 1))
         generated_img = generator(noise_vec)
         g_loss = discriminator(generated_img)
 
@@ -93,12 +93,11 @@ class WGANTrainer(NetworkTrainer):
         ###############
         ### train D ###
         ###############
-        noise_vec = torch.randn((self.batch_size, self.input_dim))
+        noise_vec = torch.randn((self.batch_size, self.input_dim, 1, 1))
 
         # loss function - discriminator acts like a 'critic'
         d_loss_real = discriminator(imgs)
         d_loss_fake = discriminator(generator(noise_vec).detach())
-        d_loss = d_loss_real - d_loss_fake
 
         if train_stage == TrainStage.TRAIN:
             d_optim.zero_grad()
@@ -107,6 +106,8 @@ class WGANTrainer(NetworkTrainer):
             d_loss_real.backward(ones)
             d_loss_fake.backward(minus_ones)
             d_optim.step()
+
+        d_loss = d_loss_real - d_loss_fake
 
         # clip parameters
         for param in discriminator.parameters():
@@ -123,10 +124,10 @@ class WGANTrainer(NetworkTrainer):
     @staticmethod
     def make_performance_metric(input_, output, loss):
         return {
-            'g_loss': loss[0].item(),
-            'd_loss': loss[1].item(),
-            'd_loss_real': loss[2].item(),
-            'd_loss_fake': loss[3].item(),
+            'g_loss': torch.mean(loss[0]).item(),
+            'd_loss': torch.mean(loss[1]).item(),
+            'd_loss_real': torch.mean(loss[2]).item(),
+            'd_loss_fake': torch.mean(loss[3]).item(),
         }
 
     def pre_epoch_finish(self, input_, output, metric_manager, train_stage: TrainStage):
