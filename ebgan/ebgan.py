@@ -19,22 +19,30 @@ class EBGANDiscriminator(nn.Module):
         super().__init__()
         # input : (b x 1 x 32 x 32)
         self.encoder = nn.Sequential(
-            nn.Conv2d(in_channels=1, out_channels=8, kernel_size=4, stride=2, padding=1),  # (b x 8 x 16 x 16)
-            nn.BatchNorm2d(8),
-            nn.ReLU(inplace=True),
+            nn.Conv2d(in_channels=1, out_channels=8,
+                      kernel_size=4, stride=2, padding=1, bias=False),  # out: (b x 8 x 16 x 16)
+            nn.LeakyReLU(0.2, inplace=True),
 
-            nn.Conv2d(8, 16, 4, 2, 1),  # (b x 16 x 8 x 8)
+            nn.Conv2d(8, 16, 4, 2, 1, bias=False),  # (b x 16 x 8 x 8)
             nn.BatchNorm2d(16),
-            nn.ReLU(inplace=True),
+            nn.LeakyReLU(0.2, inplace=True),
+
+            nn.Conv2d(16, 32, 4, 2, 1, bias=False),  # (b x 32 x 8 x 8)
+            nn.BatchNorm2d(32),
+            nn.LeakyReLU(0.2, inplace=True),
         )
 
         self.decoder = nn.Sequential(
-            nn.ConvTranspose2d(16, 8, 4, 2, 1),  # (b x 8 x 32 x 32)
-            nn.BatchNorm2d(8),
-            nn.ReLU(inplace=True),
+            nn.ConvTranspose2d(32, 16, 4, 2, 1, bias=False),  # (b x 16 x 32 x 32)
+            nn.BatchNorm2d(16),
+            nn.LeakyReLU(0.2, inplace=True),
 
-            nn.ConvTranspose2d(8, 1, 4, 2, 1),  # (b x 1 x 32 x 32)
-            nn.Sigmoid()
+            nn.ConvTranspose2d(16, 8, 4, 2, 1, bias=False),  # (b x 8 x 32 x 32)
+            nn.BatchNorm2d(8),
+            nn.LeakyReLU(0.2, inplace=True),
+
+            nn.ConvTranspose2d(8, 1, 4, 2, 1, bias=False),  # (b x 1 x 32 x 32)
+            nn.Tanh()
         )
 
         self.apply(self.init_weights)
@@ -47,7 +55,6 @@ class EBGANDiscriminator(nn.Module):
     def init_weights(m):
         if isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d):
             nn.init.kaiming_normal_(m.weight)
-            nn.init.constant_(m.bias, 0)
         elif isinstance(m, nn.BatchNorm2d):
             nn.init.normal_(m.weight, 0, 1)
 
@@ -65,24 +72,24 @@ class EBGANGenerator(nn.Module):
         self.latent_dim = latent_dim
         self.net = nn.Sequential(
             # out : (b x 64 x 2 x 2)
-            nn.ConvTranspose2d(in_channels=latent_dim, out_channels=64, kernel_size=4, stride=2, padding=1),
+            nn.ConvTranspose2d(in_channels=latent_dim, out_channels=64,
+                               kernel_size=4, stride=2, padding=1, bias=False),
             nn.BatchNorm2d(64),
             nn.ReLU(inplace=True),
 
-            nn.ConvTranspose2d(64, 32, 4, 2, 1),  # (b x 32 x 4 x 4)
+            nn.ConvTranspose2d(64, 32, 4, 2, 1, bias=False),  # (b x 32 x 4 x 4)
             nn.BatchNorm2d(32),
             nn.ReLU(inplace=True),
 
-            nn.ConvTranspose2d(32, 16, 4, 2, 1),  # (b x 16 x 8 x 8)
+            nn.ConvTranspose2d(32, 16, 4, 2, 1, bias=False),  # (b x 16 x 8 x 8)
             nn.BatchNorm2d(16),
             nn.ReLU(inplace=True),
 
-            nn.ConvTranspose2d(16, 8, 4, 2, 1),  # (b x 8 x 16 x 16)
+            nn.ConvTranspose2d(16, 8, 4, 2, 1, bias=False),  # (b x 8 x 16 x 16)
             nn.BatchNorm2d(8),
             nn.ReLU(inplace=True),
 
-            nn.ConvTranspose2d(8, 1, 4, 2, 1),  # (b x 1 x 32 x 32)
-            nn.BatchNorm2d(1),
+            nn.ConvTranspose2d(8, 1, 4, 2, 1, bias=False),  # (b x 1 x 32 x 32)
             nn.Tanh(),
         )
         self.apply(self.init_weights)
