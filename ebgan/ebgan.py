@@ -37,10 +37,19 @@ class EBGANDiscriminator(nn.Module):
             nn.Sigmoid()
         )
 
-        # nn.ConvTranspose2d(in_channels=12, out_channels=12, kernel_size=4, stride=12)
+        self.apply(self.init_weights)
+
     def forward(self, x):
         x = self.encoder(x)
         return self.decoder(x)
+
+    @staticmethod
+    def init_weights(m):
+        if isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d):
+            nn.init.kaiming_normal_(m.weight)
+            nn.init.constant_(m.bias, 0)
+        elif isinstance(m, nn.BatchNorm2d):
+            nn.init.normal_(m.weight, 0, 1)
 
 
 class EBGANGenerator(nn.Module):
@@ -76,10 +85,19 @@ class EBGANGenerator(nn.Module):
             nn.BatchNorm2d(1),
             nn.Tanh(),
         )
+        self.apply(self.init_weights)
 
     def forward(self, x):
         # the input size is given as : (b x latent_dim). Transform this to (b x latent_dim x 1 x 1)
         return self.net(x.view(-1, self.latent_dim, 1, 1))
+
+    @staticmethod
+    def init_weights(m):
+        if isinstance(m, nn.ConvTranspose2d):
+            nn.init.kaiming_normal_(m.weight)
+            nn.init.constant_(m.bias, 0)
+        elif isinstance(m, nn.BatchNorm2d):
+            nn.init.normal_(m.weight, 0, 1)
 
 
 if __name__ == '__main__':
