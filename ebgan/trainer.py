@@ -46,7 +46,7 @@ class EBGANTrainer(NetworkTrainer):
 
         # create criteria
         criteria = {
-            'l1': nn.L1Loss(),
+            'mseloss': nn.MSELoss(),
         }
 
         # create optimizers
@@ -80,7 +80,7 @@ class EBGANTrainer(NetworkTrainer):
         d_optim = optimizer['optimizer_d']
         g_optim = optimizer['optimizer_g']
 
-        l1_loss = criteria['l1']
+        mse_loss = criteria['mseloss']
 
         ### Train D
         z = torch.randn(self.batch_size, self.latent_dim).to(self.device)
@@ -91,11 +91,10 @@ class EBGANTrainer(NetworkTrainer):
         reconst_fake = discriminator(gen_imgs)
 
         # calculate the energy assigned == reconstruction loss of the 'autoencoder D'
-        energy_real = l1_loss(reconst_real, imgs)
-        energy_fake = l1_loss(reconst_fake, gen_imgs)
+        energy_real = mse_loss(reconst_real, imgs)
+        energy_fake = mse_loss(reconst_fake, gen_imgs)
 
-        zero = torch.zeros([1]).to(self.device)
-        d_loss = energy_real + torch.max(margin_tensor - energy_fake, zero)
+        d_loss = energy_real + (margin_tensor - energy_fake).clamp(min=0)
 
         if train_stage == TrainStage.TRAIN:
             d_optim.zero_grad()
@@ -106,7 +105,7 @@ class EBGANTrainer(NetworkTrainer):
         z = torch.randn(self.batch_size, self.latent_dim).to(self.device)
         gen_imgs = generator(z)
         reconst_fake_gen = discriminator(gen_imgs)
-        g_loss = l1_loss(reconst_fake_gen, gen_imgs)  # energy assigned to fake images
+        g_loss = mse_loss(reconst_fake_gen, gen_imgs)  # energy assigned to fake images
 
         if train_stage == TrainStage.TRAIN:
             g_optim.zero_grad()
