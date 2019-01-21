@@ -23,7 +23,7 @@ class MNISTLoaderMaker(DataLoaderMaker):
         self.batch_size = batch_size
         self.num_classes = 10
         self.num_workers = num_workers
-        self.dim = 32
+        self.dim = 28
 
         train_img_dir = os.path.join(data_root, 'mnist')
 

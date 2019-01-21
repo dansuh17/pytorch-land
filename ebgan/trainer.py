@@ -91,6 +91,8 @@ class EBGANTrainer(NetworkTrainer):
         reconst_fake = discriminator(gen_imgs)
 
         # calculate the energy assigned == reconstruction loss of the 'autoencoder D'
+        print(reconst_real.size())
+        print(imgs.size())
         energy_real = mse_loss(reconst_real, imgs)
         energy_fake = mse_loss(reconst_fake, gen_imgs)
 
