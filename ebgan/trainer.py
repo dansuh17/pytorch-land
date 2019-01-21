@@ -96,7 +96,6 @@ class EBGANTrainer(NetworkTrainer):
 
         zero = torch.zeros([1]).to(self.device)
         d_loss = energy_real + torch.max(margin_tensor - energy_fake, zero)
-        d_loss = torch.mean(d_loss)
 
         if train_stage == TrainStage.TRAIN:
             d_optim.zero_grad()

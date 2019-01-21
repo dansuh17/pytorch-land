@@ -19,13 +19,21 @@ class EBGANDiscriminator(nn.Module):
         super().__init__()
         # input : (b x 1 x 32 x 32)
         self.encoder = nn.Sequential(
-            nn.Conv2d(in_channels=1, out_channels=32, kernel_size=4, stride=2, padding=1),  # (b x 32 x 16 x 16)
-            nn.BatchNorm2d(32),
+            nn.Conv2d(in_channels=1, out_channels=8, kernel_size=4, stride=2, padding=1),  # (b x 8 x 16 x 16)
+            nn.BatchNorm2d(8),
+            nn.ReLU(inplace=True),
+
+            nn.Conv2d(8, 16, 4, 2, 1),  # (b x 16 x 8 x 8)
+            nn.BatchNorm2d(16),
             nn.ReLU(inplace=True),
         )
 
         self.decoder = nn.Sequential(
-            nn.ConvTranspose2d(32, 1, 4, 2, 1),  # (b x 1 x 32 x 32)
+            nn.ConvTranspose2d(16, 8, 4, 2, 1),  # (b x 8 x 32 x 32)
+            nn.BatchNorm2d(8),
+            nn.ReLU(inplace=True),
+
+            nn.ConvTranspose2d(8, 1, 4, 2, 1),  # (b x 1 x 32 x 32)
             nn.Sigmoid()
         )
 
