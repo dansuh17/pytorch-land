@@ -42,7 +42,6 @@ class EBGANDiscriminator(nn.Module):
             nn.LeakyReLU(0.2, inplace=True),
 
             nn.ConvTranspose2d(8, 1, 4, 2, 1, bias=False),  # (b x 1 x 28 x 28)
-            nn.BatchNorm2d(1),
             nn.Tanh()
         )
 

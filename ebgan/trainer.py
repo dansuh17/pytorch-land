@@ -83,26 +83,27 @@ class EBGANTrainer(NetworkTrainer):
 
         mse_loss = criteria['mseloss']
 
-        ### Train D
-        z = torch.randn(self.batch_size, self.latent_dim).to(self.device)
-        margin_tensor = torch.Tensor([self.margin]).to(self.device)
+        ### Train D ###
+        for _ in range(3):
+            z = torch.randn(self.batch_size, self.latent_dim).to(self.device)
+            margin_tensor = torch.Tensor([self.margin]).to(self.device)
 
-        gen_imgs = generator(z)
-        reconst_real = discriminator(imgs)  # reconstructed img
-        reconst_fake = discriminator(gen_imgs.detach())
+            gen_imgs = generator(z).detach()
+            reconst_real = discriminator(imgs)  # reconstructed img
+            reconst_fake = discriminator(gen_imgs)
 
-        # calculate the energy assigned == reconstruction loss of the 'autoencoder D'
-        energy_real = mse_loss(reconst_real, imgs)
-        energy_fake = mse_loss(reconst_fake, gen_imgs.detach())
+            # calculate the energy assigned == reconstruction loss of the 'autoencoder D'
+            energy_real = mse_loss(reconst_real, imgs)
+            energy_fake = mse_loss(reconst_fake, gen_imgs)
 
-        d_loss = energy_real + (margin_tensor - energy_fake).clamp(min=0)
+            d_loss = energy_real + (margin_tensor - energy_fake).clamp(min=0)
 
-        if train_stage == TrainStage.TRAIN:
-            d_optim.zero_grad()
-            d_loss.backward()
-            d_optim.step()
+            if train_stage == TrainStage.TRAIN:
+                d_optim.zero_grad()
+                d_loss.backward()
+                d_optim.step()
 
-        ### Train G
+        ### Train G ###
         z = torch.randn(self.batch_size, self.latent_dim).to(self.device)
 
         gen_imgs = generator(z)
