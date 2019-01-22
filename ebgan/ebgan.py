@@ -19,29 +19,29 @@ class EBGANDiscriminator(nn.Module):
         super().__init__()
         # input : (b x 1 x 28 x 28)
         self.encoder = nn.Sequential(
-            nn.Conv2d(in_channels=1, out_channels=8,
-                      kernel_size=4, stride=2, padding=1, bias=False),  # out: (b x 8 x 14 x 14)
+            nn.Conv2d(in_channels=1, out_channels=64,
+                      kernel_size=4, stride=2, padding=1, bias=False),  # out: (b x 64 x 14 x 14)
             nn.LeakyReLU(0.2, inplace=True),
 
-            nn.Conv2d(8, 16, 4, 2, 1, bias=False),  # (b x 16 x 8 x 8)
-            nn.BatchNorm2d(16),
+            nn.Conv2d(64, 128, 4, 2, 1, bias=False),  # (b x 128 x 8 x 8)
+            nn.BatchNorm2d(128),
             nn.LeakyReLU(0.2, inplace=True),
 
-            nn.Conv2d(16, 32, 4, 2, 1, bias=False),  # (b x 32 x 3 x 3)
-            nn.BatchNorm2d(32),
+            nn.Conv2d(128, 256, 4, 2, 1, bias=False),  # (b x 256 x 3 x 3)
+            nn.BatchNorm2d(256),
             nn.LeakyReLU(0.2, inplace=True),
         )
 
         self.decoder = nn.Sequential(
-            nn.ConvTranspose2d(32, 16, 4, 2, 1, bias=False),  # (b x 16 x 6 x 6)
-            nn.BatchNorm2d(16),
+            nn.ConvTranspose2d(256, 128, 4, 2, 1, bias=False),  # (b x 128 x 6 x 6)
+            nn.BatchNorm2d(128),
             nn.LeakyReLU(0.2, inplace=True),
 
-            nn.ConvTranspose2d(16, 8, 4, 2, bias=False),  # (b x 8 x 14 x 14)
-            nn.BatchNorm2d(8),
+            nn.ConvTranspose2d(128, 64, 4, 2, bias=False),  # (b x 64 x 14 x 14)
+            nn.BatchNorm2d(64),
             nn.LeakyReLU(0.2, inplace=True),
 
-            nn.ConvTranspose2d(8, 1, 4, 2, 1, bias=False),  # (b x 1 x 28 x 28)
+            nn.ConvTranspose2d(64, 1, 4, 2, 1, bias=False),  # (b x 1 x 28 x 28)
             nn.Tanh()
         )
 
