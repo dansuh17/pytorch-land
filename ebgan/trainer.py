@@ -10,7 +10,7 @@ from base_trainer import NetworkTrainer, ModelInfo, TrainStage
 
 class EBGANTrainer(NetworkTrainer):
     """
-    Trainer for Auxiliary Classifier GANs (AC-GAN).
+    Trainer for Energy Based GAN.
     """
     def __init__(self, config: dict):
         print('Configuration')
@@ -25,7 +25,7 @@ class EBGANTrainer(NetworkTrainer):
         # create data loader maker
         loader_maker = MNISTLoaderMaker(
             data_root='data_in', batch_size=self.batch_size, naive_normalization=True)
-        self.img_dim =loader_maker.dim
+        self.img_dim = loader_maker.dim
 
         generator = EBGANGenerator(latent_dim=self.latent_dim)
         discriminator = EBGANDiscriminator()
@@ -60,7 +60,8 @@ class EBGANTrainer(NetworkTrainer):
 
         # create the trainer instance
         super().__init__(
-            models, loader_maker, criteria, optimizers, epoch=self.total_epoch)
+            models, loader_maker, criteria, optimizers,
+            epoch=self.total_epoch, num_devices=2)
 
         self.epoch = 0
 
@@ -88,13 +89,11 @@ class EBGANTrainer(NetworkTrainer):
 
         gen_imgs = generator(z)
         reconst_real = discriminator(imgs)  # reconstructed img
-        reconst_fake = discriminator(gen_imgs)
+        reconst_fake = discriminator(gen_imgs.detach())
 
         # calculate the energy assigned == reconstruction loss of the 'autoencoder D'
-        print(reconst_real.size())
-        print(imgs.size())
         energy_real = mse_loss(reconst_real, imgs)
-        energy_fake = mse_loss(reconst_fake, gen_imgs)
+        energy_fake = mse_loss(reconst_fake, gen_imgs.detach())
 
         d_loss = energy_real + (margin_tensor - energy_fake).clamp(min=0)
 
@@ -105,6 +104,7 @@ class EBGANTrainer(NetworkTrainer):
 
         ### Train G
         z = torch.randn(self.batch_size, self.latent_dim).to(self.device)
+
         gen_imgs = generator(z)
         reconst_fake_gen = discriminator(gen_imgs)
         g_loss = mse_loss(reconst_fake_gen, gen_imgs)  # energy assigned to fake images

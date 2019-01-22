@@ -97,7 +97,8 @@ class EBGANGenerator(nn.Module):
         self.apply(self.init_weights)
 
     def forward(self, x):
-        # the input size is given as : (b x latent_dim). Transform this to (b x latent_dim x 1 x 1)
+        # the input size is given as : (b x latent_dim).
+        # Transform this to (b x latent_dim x 1 x 1)
         return self.net(x.view(-1, self.latent_dim, 1, 1))
 
     @staticmethod
