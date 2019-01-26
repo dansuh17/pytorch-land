@@ -11,9 +11,6 @@ from torch import nn
 class EBGANDiscriminator(nn.Module):
     """
     EBGAN Discriminator model for training MNIST.
-    The number of conv layers follows the 'best model' specified in Appendix C of the paper.
-
-    - nLayerD = 2
     """
     def __init__(self):
         super().__init__()
