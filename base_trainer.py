@@ -224,14 +224,17 @@ class NetworkTrainer(ABC):
             best_metric = self._save_best_model(self.models, best_metric, target_metric)
 
             # update learning rate based on validation metric
-            if self.lr_schedulers is not None:
-                for idx, lrs in enumerate(self.lr_schedulers):
-                    lrs.step(val_metrics.mean(self.standard_metric))
+            self._update_lr(val_metrics)
 
             self.epoch += 1
         # run upon test set
         test_metrics = self.test()
         print('Training complete.')
+
+    def _update_lr(self, val_metrics):
+        if self.lr_schedulers is not None:
+            for idx, lrs in enumerate(self.lr_schedulers):
+                lrs.step(val_metrics.mean(self.standard_metric))
 
     @abstractmethod
     def run_step(self,

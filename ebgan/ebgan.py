@@ -39,7 +39,6 @@ class EBGANDiscriminator(nn.Module):
             nn.LeakyReLU(0.2, inplace=True),
 
             nn.ConvTranspose2d(64, 1, 4, 2, 1, bias=False),  # (b x 1 x 28 x 28)
-            nn.Tanh()
         )
 
         self.apply(self.init_weights)

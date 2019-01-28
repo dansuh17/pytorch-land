@@ -12,6 +12,9 @@ from base_trainer import NetworkTrainer, ModelInfo, TrainStage
 
 
 class BEGANTrainer(NetworkTrainer):
+    """
+    Trainer for BEGAN.
+    """
     def __init__(self, config: dict):
         print('Configuration')
         print(config)
@@ -60,10 +63,18 @@ class BEGANTrainer(NetworkTrainer):
                 discriminator.parameters(), lr=self.lr_init, betas=(0.5, 0.999)),
         }
 
+        # define learning rate schedulers
+        lr_schedulers = (
+            optim.lr_scheduler.StepLR(
+                optimizers['optimizer_g'], step_size=20, gamma=0.2, last_epoch=140),
+            optim.lr_scheduler.StepLR(
+                optimizers['optimizer_d'], step_size=20, gamma=0.2, last_epoch=140),
+        )
+
         # create the trainer instance
         super().__init__(
             models, loader_maker, criteria, optimizers,
-            epoch=self.total_epoch, num_devices=2)
+            epoch=self.total_epoch, num_devices=2, lr_scheduler=lr_schedulers)
 
         self.epoch = 0
 
@@ -135,6 +146,10 @@ class BEGANTrainer(NetworkTrainer):
         )
         loss = (d_loss, g_loss, real_loss, fake_loss)
         return outputs, loss
+
+    def _update_lr(self, val_metrics):
+        for lrs in enumerate(self.lr_schedulers):
+            lrs.step()
 
     @staticmethod
     def convergence_measure(real_loss, gen_fake_loss, equilibrium_const):
