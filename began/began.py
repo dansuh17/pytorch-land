@@ -14,23 +14,23 @@ class BEGANGenerator(nn.Module):
                 in_channels=24, out_channels=24,
                 kernel_size=3, stride=1, padding=1, bias=False),  # (b x 24 x 7 x 7)
             nn.BatchNorm2d(24),
-            nn.LeakyReLU(0.2, inplace=True),
+            nn.ReLU(inplace=True),
 
             nn.Conv2d(
                 in_channels=24, out_channels=24,
                 kernel_size=3, stride=1, padding=1, bias=False),  # (b x 24 x 7 x 7)
             nn.BatchNorm2d(24),
-            nn.LeakyReLU(0.2, inplace=True),
+            nn.ReLU(inplace=True),
 
             nn.UpsamplingNearest2d(scale_factor=2),  # (b x 24 x 14 x 14)
 
             nn.Conv2d(24, 24, 3, 1, 1, bias=False),  # (b x 24 x 14 x 14)
             nn.BatchNorm2d(24),
-            nn.LeakyReLU(0.2, inplace=True),
+            nn.ReLU(inplace=True),
 
             nn.Conv2d(24, 24, 3, 1, 1, bias=False),  # (b x 24 x 14 x 14)
             nn.BatchNorm2d(24),
-            nn.LeakyReLU(0.2, inplace=True),
+            nn.ReLU(inplace=True),
 
             nn.UpsamplingNearest2d(scale_factor=2),  # (b x 24 x 28 x 28)
 

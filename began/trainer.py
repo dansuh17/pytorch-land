@@ -66,9 +66,9 @@ class BEGANTrainer(NetworkTrainer):
         # define learning rate schedulers
         lr_schedulers = (
             optim.lr_scheduler.StepLR(
-                optimizers['optimizer_g'], step_size=20, gamma=0.2, last_epoch=140),
+                optimizers['optimizer_g'], step_size=20, gamma=0.2),
             optim.lr_scheduler.StepLR(
-                optimizers['optimizer_d'], step_size=20, gamma=0.2, last_epoch=140),
+                optimizers['optimizer_d'], step_size=20, gamma=0.2),
         )
 
         # create the trainer instance
@@ -148,7 +148,7 @@ class BEGANTrainer(NetworkTrainer):
         return outputs, loss
 
     def _update_lr(self, val_metrics):
-        for lrs in enumerate(self.lr_schedulers):
+        for lrs in self.lr_schedulers:
             lrs.step()
 
     @staticmethod
