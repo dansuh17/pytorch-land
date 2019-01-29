@@ -24,7 +24,7 @@ class BEGANTrainer(NetworkTrainer):
         self.total_epoch = config['epoch']
         self.display_imgs = config['display_imgs']
         self.prop_lr = 0.001  # lambda value in the paper
-        self.equilibrium_const = 0.3  # gamma value in the paper
+        self.equilibrium_const = 0.7  # gamma value in the paper
         self.k = 0  # equilibrium regularizing constant init value
 
         # create data loader maker
@@ -50,9 +50,7 @@ class BEGANTrainer(NetworkTrainer):
         }
 
         # create criteria
-        criteria = {
-            'mseloss': nn.MSELoss(),
-        }
+        criteria = {'mseloss': nn.MSELoss()}
 
         # create optimizers
         self.lr_init = config['lr_init']
