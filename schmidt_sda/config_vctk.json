@@ -1,9 +1,9 @@
 {
   "model_name": "dansuh",
-  "data_dir": "dansuhnet_data_in/noisy_custom_vctk",
+  "data_dir": "dansuhnet_data_in/audiop_noisy_musicset_processed",
   "batch_size": 128,
   "num_devices": 4,
-  "epoch": 600,
+  "epoch": 200,
   "lr_init": 0.001,
   "input_channel": 1,
   "input_width": 40,

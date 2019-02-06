@@ -190,6 +190,56 @@ def noisy_vctk_preprocess(
             out_dir=out_dir, mel=mel)
 
 
+def audiop_noisy_musicset_preprocess(
+        in_path: str, out_path: str, clean_dir: str, noisy_dir: str,
+        target_sr=16000, window_size=256, hop_size: int=None, split_size=11, mel=True):
+    """
+    Function for preprocessing audiop_noisy_musicset.
+    The dataset should already have been unzipped to `in_path` directory.
+    Preprocessed files are extracted in `.npy` format that contains
+    clean, noisy spectrogram pairs.
+
+    Each mel spectrogram has size of (n_mel, split_size).
+
+    Args:
+        in_path (str): input directory
+        out_path (str): desired output directory
+        clean_dir (str): clean dataset directory (input)
+        noisy_dir (str): noisy dataset directory (input)
+        target_sr (int): target sample rate
+        window_size (int): window size
+        hop_size (int): hop size
+        split_size (int): number of frames of a chunk
+        mel (bool): True if wanting to use mel-spectrogram
+    """
+    if hop_size is None:
+        hop_size = window_size // 2  # 0.5 hop by default
+
+    noisy_data_path = os.path.join(in_path, noisy_dir)
+    print('Preprocessing : {} and {}'.format(clean_dir, noisy_dir))
+    for fname in tqdm(os.listdir(noisy_data_path), ascii=True):
+        # parse the file name that should have form : 
+        #'<artist>_<title>_chk<chunk_num>_<noise_type>_chk<noise_chunk_num>_snr<snr>.wav'
+        fname_split = fname.split('_')
+        audiof_base = None
+        for idx, part in enumerate(fname_split):
+            if 'chk' in part:
+                audiof_base = '_'.join(fname_split[:idx + 1])
+                break
+
+        noisy_full_path = os.path.join(in_path, noisy_dir, fname)
+
+        # also read the noisy audio as well
+        clean_counterpart_path = os.path.join(in_path, clean_dir, audiof_base + '.wav')
+
+        # split spectrograms and save clean / noise pairs
+        split_and_save_clean_noise_pair(
+            clean_counterpart_path, noisy_full_path,
+            sr=target_sr, window_size=window_size,
+            hop_size=hop_size, split_size=split_size,
+            out_dir=out_path, mel=mel)
+
+
 def split_and_save_clean_noise_pair(
         clean_path, noisy_path, sr: int, window_size: int,
         hop_size: int, split_size: int, out_dir: str, mel=True):
@@ -345,17 +395,59 @@ def preprocess():
     )
 
 
+
+
 if __name__ == '__main__':
-    preprocess()
+    # preprocess()
+    path = os.path.join(os.path.dirname(__file__))
+
+    dataset_path = os.path.join(path, 'audiop_noisy_musicset')
+
+    out_path = 'audiop_noisy_musicset_processed'
+    out_path_test = 'audiop_noisy_musicset_processed_test'
+    # preprocess train set
+    audiop_noisy_musicset_preprocess(
+        in_path=dataset_path,
+        out_path=out_path,
+        noisy_dir='train_mixed',
+        clean_dir='train_music',
+        split_size=SPLIT_SIZE,
+    )
+    # preprocess test set
+    audiop_noisy_musicset_preprocess(
+        in_path=dataset_path,
+        out_path=out_path,
+        noisy_dir='test_mixed',
+        clean_dir='test_music',
+        split_size=SPLIT_SIZE,
+    )
+
+    ### UNCOMMENT BELOW TO PROCESS ORIGINAL SPECTROGRAMS FOR TRAINING SET
+    # create spectrogram data also - used for waveform recovery
+    # out_path_spectrogram = 'vctk_spectrogram'
+    # audiop_noisy_musicset_preprocess(
+    #     in_path=dataset_path,
+    #     out_path=out_path_spectrogram,
+    #     noisy_dir=NOISY_TRAINSET_DIR,
+    #     clean_dir=CLEAN_TRAINSET_DIR,
+    #     mel=False)
+    audiop_noisy_musicset_preprocess(
+        in_path=dataset_path,
+        out_path=out_path_test,
+        noisy_dir='test_mixed',
+        clean_dir='test_music',
+        split_size=SPLIT_SIZE,
+        mel=False,
+    )
 
     # # uncomment this for extracting local test set
-    # noisy_vctk_preprocess(
+    # audiop_noisy_musicset_preprocess(
     #     in_path='test',
     #     out_path='test/test_processed',
     #     noisy_dir=NOISY_TESTSET_WAV,
     #     clean_dir=CLEAN_TESTSET_WAV,
     #     split_size=SPLIT_SIZE)
-    # noisy_vctk_preprocess(
+    # audiop_noisy_musicset_preprocess(
     #     in_path='test',
     #     out_path='test/test_processed_spectrogram',
     #     noisy_dir=NOISY_TESTSET_WAV,
