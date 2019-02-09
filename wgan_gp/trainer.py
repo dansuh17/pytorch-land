@@ -105,25 +105,25 @@ class WGANTrainer(NetworkTrainer):
         img_interp = (imgs - generated_img) * alpha + generated_img
         img_interp = img_interp.detach().requires_grad_()  # set requires_grad=True to store the grad value
         score_img_interp = discriminator(img_interp)
-        score_img_interp.backward(torch.ones(img_interp.size()))
-        gp = self.grad_penalty_coeff * torch.pow(img_interp.grad.norm(dim=1) - 1, 2).mean()
+        score_img_interp.backward(torch.ones(img_interp.size()))  # MUST zero_grad after calculation!
+        # norm of gradients calculated per samples in batch
+        # output size: [batch_size]
+        grad_per_samps = img_interp.grad.view((self.batch_size, -1)).norm(dim=1)
+        # get l2-norm of gradient penalty
+        grad_penalty = self.grad_penalty_coeff * torch.pow(grad_per_samps - 1, 2).mean()
+
+        d_loss = d_loss_real.mean() - d_loss_fake.mean() + grad_penalty
 
         if train_stage == TrainStage.TRAIN:
             d_optim.zero_grad()
-            # backward process must be provided with the tensor w.r.t.
-            # the gradient will be calculated, since these are not scalar valued tensors
-            d_loss_real += gp
-            d_loss_real.backward(ones)
-            d_loss_fake.backward(minus_ones)
+            d_loss.backward()
             d_optim.step()
-
-        d_loss = d_loss_real - d_loss_fake + gp
 
         # collect outputs as return values
         outputs = (
             generated_img,
             imgs,
-            gp,
+            grad_penalty,
         )
         losses = (g_loss, d_loss, d_loss_real, d_loss_fake)
         return outputs, losses
@@ -132,10 +132,10 @@ class WGANTrainer(NetworkTrainer):
     def make_performance_metric(input_, output, loss):
         return {
             'gp': output[2].item(),
-            'g_loss': torch.mean(loss[0]).item(),
-            'd_loss': torch.mean(loss[1]).item(),
-            'd_loss_real': torch.mean(loss[2]).item(),
-            'd_loss_fake': torch.mean(loss[3]).item(),
+            'g_loss': loss[0].item(),
+            'd_loss': loss[1].item(),
+            'd_loss_real': loss[2].item(),
+            'd_loss_fake': loss[3].item(),
         }
 
     def pre_epoch_finish(self, input_, output, metric_manager, train_stage: TrainStage):
