@@ -154,7 +154,7 @@ class WGANTrainer(NetworkTrainer):
 
 if __name__ == '__main__':
     import json
-    with open('wgan/config.json', 'r') as configf:
+    with open('wgan_gp/config.json', 'r') as configf:
         config = json.loads(configf.read())
 
     trainer = WGANTrainer(config)
