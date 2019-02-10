@@ -105,7 +105,7 @@ class WGANTrainer(NetworkTrainer):
         img_interp = (imgs - generated_img) * alpha + generated_img
         img_interp = img_interp.detach().requires_grad_()  # set requires_grad=True to store the grad value
         score_img_interp = discriminator(img_interp)
-        score_img_interp.backward(torch.ones(img_interp.size()))  # MUST zero_grad after calculation!
+        score_img_interp.backward(torch.ones((self.batch_size, 1)))  # MUST zero_grad after calculation!
         # norm of gradients calculated per samples in batch
         # output size: [batch_size]
         grad_per_samps = img_interp.grad.view((self.batch_size, -1)).norm(dim=1)
