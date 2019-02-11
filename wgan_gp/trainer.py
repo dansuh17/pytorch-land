@@ -97,26 +97,29 @@ class WGANTrainer(NetworkTrainer):
 
         # loss function - discriminator acts like a 'critic'
         d_loss_real = discriminator(imgs)
-        d_loss_fake = discriminator(generator(noise_vec).detach())
+        d_loss_fake = discriminator(generator(noise_vec).detach())  # prevent generator updates
 
         ### calculate the gradient penalty (GP)
         # linear-interpolated input
         alpha = random.random()
         img_interp = (imgs - generated_img) * alpha + generated_img
         img_interp = img_interp.detach().requires_grad_()  # set requires_grad=True to store the grad value
-        score_img_interp = discriminator(img_interp)
-        score_img_interp.backward(torch.ones((self.batch_size, 1)))  # MUST zero_grad after calculation!
-        # norm of gradients calculated per samples in batch
-        # output size: [batch_size]
-        grad_per_samps = img_interp.grad.view((self.batch_size, -1)).norm(dim=1)
-        # get l2-norm of gradient penalty
-        grad_penalty = self.grad_penalty_coeff * torch.pow(grad_per_samps - 1, 2).mean()
 
-        d_loss = d_loss_real.mean() - d_loss_fake.mean() + grad_penalty
+        # pass through discriminator
+        score_img_interp = discriminator(img_interp)
+        score_img_interp.backward(torch.ones((self.batch_size, 1)).to(self.device))  # MUST zero_grad after calculation!
+        # Frobenius norm of gradients calculated per samples in batch
+        # output size: [batch_size]
+        # Resize the grad tensor to (b, -1) so that each sample's gradient is representd as a 1D vector
+        grad_per_samps = img_interp.grad.view((self.batch_size, -1)).norm(dim=1)
+        # get l2-norm (vector norm) of gradient penalty
+        grad_penalty = self.grad_penalty_coeff * torch.pow(grad_per_samps - 1, 2)
+
+        d_loss = d_loss_real - d_loss_fake + grad_penalty
 
         if train_stage == TrainStage.TRAIN:
             d_optim.zero_grad()
-            d_loss.backward()
+            d_loss.backward(torch.ones((self.batch_size, 1)).to(self.device))
             d_optim.step()
 
         # collect outputs as return values
@@ -124,6 +127,7 @@ class WGANTrainer(NetworkTrainer):
             generated_img,
             imgs,
             grad_penalty,
+            grad_per_samps,
         )
         losses = (g_loss, d_loss, d_loss_real, d_loss_fake)
         return outputs, losses
@@ -131,11 +135,12 @@ class WGANTrainer(NetworkTrainer):
     @staticmethod
     def make_performance_metric(input_, output, loss):
         return {
-            'gp': output[2].item(),
-            'g_loss': loss[0].item(),
+            'gp': torch.mean(output[2]).item(),
+            'grad_per_samps': torch.mean(output[3]).item(),
+            'g_loss': torch.mean(loss[0]).item(),
             'd_loss': loss[1].item(),
-            'd_loss_real': loss[2].item(),
-            'd_loss_fake': loss[3].item(),
+            'd_loss_real': torch.mean(loss[2]).item(),
+            'd_loss_fake': torch.mean(loss[3]).item(),
         }
 
     def pre_epoch_finish(self, input_, output, metric_manager, train_stage: TrainStage):
