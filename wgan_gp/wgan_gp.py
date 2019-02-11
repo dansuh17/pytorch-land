@@ -93,6 +93,7 @@ if __name__ == '__main__':
     disc_out = d(output)
     print(disc_out)
     print(disc_out.size())
+    print(disc_out.squeeze().size())
     disc_out.backward(torch.ones(disc_out.size()))
 
     # testing calculation of GP
@@ -102,13 +103,19 @@ if __name__ == '__main__':
     img_interp = (real_img - output) * alpha + output
     img_interp = img_interp.detach().requires_grad_()  # set requires_grad=True to store the grad value
     score_img_interp = d(img_interp)
-    score_img_interp.backward(torch.ones(score_img_interp.size()))
+    score_img_interp.backward(torch.ones((3, 1)))
 
-    grad_pen = 10 * torch.pow(img_interp.grad.norm(2, dim=1) - 1, 2).mean()
+    grads = img_interp.grad
+    grad_norm = grads.view((3, -1)).norm(dim=1)
+    print(grads.size())
+    print(grad_norm.size())
+
+    grad_pen = 10 * torch.pow(grad_norm - 1, 2)
     # out = output.detach().requires_grad_()
     # disc_out2 = d(out)
     # disc_out2.backward(torch.ones(disc_out2.size()))
     # print(out.grad)
     print(grad_pen)
-    res = score_img_interp + grad_pen
-    res.backward()
+    print(score_img_interp.size())
+    res = score_img_interp.squeeze() + grad_pen
+    res.backward(torch.ones((3, )))

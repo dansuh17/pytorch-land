@@ -101,25 +101,27 @@ class WGANTrainer(NetworkTrainer):
 
         ### calculate the gradient penalty (GP)
         # linear-interpolated input
-        alpha = random.random()
+        alpha = random.random()  # interpolation constant
         img_interp = (imgs - generated_img) * alpha + generated_img
         img_interp = img_interp.detach().requires_grad_()  # set requires_grad=True to store the grad value
 
         # pass through discriminator
         score_img_interp = discriminator(img_interp)
         score_img_interp.backward(torch.ones((self.batch_size, 1)).to(self.device))  # MUST zero_grad after calculation!
+
         # Frobenius norm of gradients calculated per samples in batch
         # output size: [batch_size]
         # Resize the grad tensor to (b, -1) so that each sample's gradient is representd as a 1D vector
         grad_per_samps = img_interp.grad.view((self.batch_size, -1)).norm(dim=1)
-        # get l2-norm (vector norm) of gradient penalty
+        # get root squared loss of the gradients (target = 1)
         grad_penalty = self.grad_penalty_coeff * torch.pow(grad_per_samps - 1, 2)
 
-        d_loss = d_loss_real - d_loss_fake + grad_penalty
+        d_loss = d_loss_real.squeeze() - d_loss_fake.squeeze() + grad_penalty.squeeze()
 
         if train_stage == TrainStage.TRAIN:
             d_optim.zero_grad()
-            d_loss.backward(torch.ones((self.batch_size, 1)).to(self.device))
+            # calculate the loss "per samples"
+            d_loss.backward(torch.ones((self.batch_size, )).to(self.device))
             d_optim.step()
 
         # collect outputs as return values
