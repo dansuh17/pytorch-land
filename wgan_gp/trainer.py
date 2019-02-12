@@ -140,7 +140,7 @@ class WGANTrainer(NetworkTrainer):
             'gp': torch.mean(output[2]).item(),
             'grad_per_samps': torch.mean(output[3]).item(),
             'g_loss': torch.mean(loss[0]).item(),
-            'd_loss': loss[1].item(),
+            'd_loss': torch.mean(loss[1]).item(),
             'd_loss_real': torch.mean(loss[2]).item(),
             'd_loss_fake': torch.mean(loss[3]).item(),
         }
@@ -157,6 +157,16 @@ class WGANTrainer(NetworkTrainer):
     def add_generated_image(self, imgs, nrow, height, width, name: str):
         grid = torchvision.utils.make_grid(imgs[:nrow, :], nrow=nrow, normalize=True)
         self.writer.add_image('{}/{}'.format(self.epoch, name), grid, self.train_step)
+
+    def validate(self):
+        # should not set torch.no_grad() since we are utilizing them!
+        results = self._run_epoch(self.val_dataloader, TrainStage.VALIDATE)
+        return results
+
+    def test(self):
+        # should not set torch.no_grad() since we are utilizing them!
+        results = self._run_epoch(self.test_dataloader, TrainStage.TEST)
+        return results
 
 
 if __name__ == '__main__':
