@@ -60,6 +60,35 @@ class WGANTrainer(NetworkTrainer):
 
         self.epoch = 0
 
+    def calc_gradient_penalty(self, real_img, gen_img, discriminator):
+        """
+        Calculate the gradient penalty (GP).
+        Args:
+            real_img(nn.Tensor): real image batch
+            gen_img(nn.Tensor): generated image batch
+            discriminator(nn.Module): discriminator model
+
+        Returns:
+            grad_penalty(nn.Tensor): gradient penalty value
+        """
+        alpha = random.random()  # interpolation constant
+        # interpolated image
+        img_interp = (real_img - gen_img) * alpha + gen_img
+        # set requires_grad=True to store the grad value
+        img_interp = img_interp.detach().requires_grad_()
+
+        # pass through discriminator
+        score_img_interp = discriminator(img_interp)
+        score_img_interp.backward(torch.ones((self.batch_size, 1)).to(self.device))  # MUST zero_grad after calculation!
+
+        # Frobenius norm of gradients calculated per samples in batch
+        # output size: [batch_size]
+        # Resize the grad tensor to (b, -1) so that each sample's gradient is represented as a 1D vector
+        grad_per_samps = img_interp.grad.view((self.batch_size, -1)).norm(dim=1)
+        # get root squared loss of the gradients (target = 1)
+        grad_penalty = self.grad_penalty_coeff * torch.pow(grad_per_samps - 1, 2)
+        return grad_penalty
+
     def run_step(self,
                  model: Dict[str, ModelInfo],
                  criteria,
@@ -99,37 +128,33 @@ class WGANTrainer(NetworkTrainer):
         d_loss_real = discriminator(imgs)
         d_loss_fake = discriminator(generator(noise_vec).detach())  # prevent generator updates
 
-        ### calculate the gradient penalty (GP)
-        # linear-interpolated input
-        alpha = random.random()  # interpolation constant
-        img_interp = (imgs - generated_img) * alpha + generated_img
-        img_interp = img_interp.detach().requires_grad_()  # set requires_grad=True to store the grad value
-
-        # pass through discriminator
-        score_img_interp = discriminator(img_interp)
-        score_img_interp.backward(torch.ones((self.batch_size, 1)).to(self.device))  # MUST zero_grad after calculation!
-
-        # Frobenius norm of gradients calculated per samples in batch
-        # output size: [batch_size]
-        # Resize the grad tensor to (b, -1) so that each sample's gradient is representd as a 1D vector
-        grad_per_samps = img_interp.grad.view((self.batch_size, -1)).norm(dim=1)
-        # get root squared loss of the gradients (target = 1)
-        grad_penalty = self.grad_penalty_coeff * torch.pow(grad_per_samps - 1, 2)
+        # calculate the gradient penalty (GP)
+        grad_penalty = self.calc_gradient_penalty(imgs, generated_img, discriminator)
 
         d_loss = d_loss_real.squeeze() - d_loss_fake.squeeze() + grad_penalty.squeeze()
 
+        grad_norm_mean = None
         if train_stage == TrainStage.TRAIN:
             d_optim.zero_grad()
             # calculate the loss "per samples"
             d_loss.backward(torch.ones((self.batch_size, )).to(self.device))
-            d_optim.step()
+
+            ### calculate gradient norms for observation
+            grad_sum = torch.zeros(())
+            cnt = 0
+            for param in discriminator.parameters():
+                cnt += 1
+                grad_sum += param.grad.data.mean()
+            grad_norm_mean = grad_sum / cnt
+
+            d_optim.step()  # update parameters
 
         # collect outputs as return values
         outputs = (
             generated_img,
             imgs,
             grad_penalty,
-            grad_per_samps,
+            grad_norm_mean,
         )
         losses = (g_loss, d_loss, d_loss_real, d_loss_fake)
         return outputs, losses
@@ -138,7 +163,7 @@ class WGANTrainer(NetworkTrainer):
     def make_performance_metric(input_, output, loss):
         return {
             'gp': torch.mean(output[2]).item(),
-            'grad_per_samps': torch.mean(output[3]).item(),
+            'grad_norm_mean': output[3].item(),
             'g_loss': torch.mean(loss[0]).item(),
             'd_loss': torch.mean(loss[1]).item(),
             'd_loss_real': torch.mean(loss[2]).item(),
