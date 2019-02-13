@@ -133,7 +133,7 @@ class WGANTrainer(NetworkTrainer):
 
         d_loss = d_loss_real.squeeze() - d_loss_fake.squeeze() + grad_penalty.squeeze()
 
-        grad_norm_mean = None
+        grad_norm_mean = torch.zeros(())
         if train_stage == TrainStage.TRAIN:
             d_optim.zero_grad()
             # calculate the loss "per samples"
