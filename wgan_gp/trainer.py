@@ -2,6 +2,7 @@ import random
 from typing import Dict
 import torch
 from torch import optim
+from torch import autograd
 import torchvision
 from .wgan_gp import WganGpDiscriminator
 from .wgan_gp import WganGpGenerator
@@ -79,12 +80,20 @@ class WGANTrainer(NetworkTrainer):
 
         # pass through discriminator
         score_img_interp = discriminator(img_interp)
-        score_img_interp.backward(torch.ones((self.batch_size, 1)).to(self.device))  # MUST zero_grad after calculation!
+
+        # calculate the gradients of scores w.r.t. interpolated images
+        grads = autograd.grad(
+            outputs=score_img_interp,
+            inputs=img_interp,
+            grad_outputs=torch.ones(score_img_interp.size()).to(self.device),
+            create_graph=True,
+            retain_graph=True,
+            only_inputs=True)
 
         # Frobenius norm of gradients calculated per samples in batch
         # output size: [batch_size]
         # Resize the grad tensor to (b, -1) so that each sample's gradient is represented as a 1D vector
-        grad_per_samps = img_interp.grad.view((self.batch_size, -1)).norm(dim=1)
+        grad_per_samps = grads.norm(dim=1)
         # get root squared loss of the gradients (target = 1)
         grad_penalty = self.grad_penalty_coeff * torch.pow(grad_per_samps - 1, 2)
         return grad_penalty

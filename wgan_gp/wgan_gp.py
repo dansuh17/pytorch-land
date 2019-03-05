@@ -1,11 +1,14 @@
 """
+Models for Wasserstein GAN with Gradient Penalty.
+Gulrajani et al. - "Improved Training of Wasserstein GANs" (2017)
 """
 import torch
 from torch import nn
 
 
 class WganGpGenerator(nn.Module):
-    """Generator model of WGAN-GP.
+    """
+    Generator model of WGAN-GP.
     """
     def __init__(self, input_dim: int):
         super().__init__()
@@ -42,7 +45,8 @@ class WganGpGenerator(nn.Module):
 
 
 class WganGpDiscriminator(nn.Module):
-    """Discriminator model of WGAN-GP.
+    """
+    Discriminator model of WGAN-GP.
     """
     def __init__(self):
         super().__init__()
