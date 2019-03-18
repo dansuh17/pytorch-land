@@ -88,14 +88,14 @@ class WGANTrainer(NetworkTrainer):
             grad_outputs=torch.ones(score_img_interp.size()).to(self.device),
             create_graph=True,
             retain_graph=True,
-            only_inputs=True)
+            only_inputs=True)[0]
 
         # Frobenius norm of gradients calculated per samples in batch
         # output size: [batch_size]
         # Resize the grad tensor to (b, -1) so that each sample's gradient is represented as a 1D vector
         grad_per_samps = grads.norm(dim=1)
         # get root squared loss of the gradients (target = 1)
-        grad_penalty = self.grad_penalty_coeff * torch.pow(grad_per_samps - 1, 2)
+        grad_penalty = self.grad_penalty_coeff * torch.pow(grad_per_samps - 1, 2).mean()
         return grad_penalty
 
     def run_step(self,
