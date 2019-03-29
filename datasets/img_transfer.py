@@ -19,13 +19,14 @@ class Monet2PhotoDataset(data.Dataset):
     and dataset dowload script: https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix/blob/master/datasets/download_cyclegan_dataset.sh
     for reference.
     """
-    def __init__(self, monet_path: str, photo_path: str, transform=None, shuffle=True):
+    def __init__(self, monet_path: str, photo_path: str, transform=None, shuffle=True, random_samp: int = 100000):
         """
         Args:
             monet_path(str): path to images of Monet paintings
             photo_path(str): path to photographs
             transform(callable): image transform chains
             shuffle(bool): if True, shuffles the ordering of pairs
+            random_samp(int): if not None, randomly sample this amount from the entire set
         """
         super().__init__()
         self.monets = [os.path.join(monet_path, fname) for fname in os.listdir(monet_path)]
@@ -39,8 +40,8 @@ class Monet2PhotoDataset(data.Dataset):
 
         # create all possible pairs of paths of images
         self.datapairs = list(itertools.product(self.monets, self.photos))
-        if shuffle:
-            random.shuffle(self.datapairs)
+        if random_samp is not None and random_samp <= len(self.datapairs):
+            self.datapairs = random.sample(self.datapairs, random_samp)
 
     def __getitem__(self, index):
         monet_path, photo_path = self.datapairs[index]
