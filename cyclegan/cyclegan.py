@@ -8,6 +8,11 @@ class CycleGanGenerator(nn.Module):
         super().__init__()
         # input: (3, w, h) (3, 256, 256) for monet dataset
         # output: (3, w, h) (3, 256, 256) for monet dataset
+        self.net = nn.Sequential(
+            nn.Conv2d(in_channels=3, out_channels=64, kernel_size=3, padding=1, bias=False),
+            nn.InstanceNorm2d(64),
+            nn.ReLU(inplace=True),
+        )
 
     def forward(self, x):
         pass
@@ -25,7 +30,7 @@ class CycleGanDiscriminator(nn.Module):
 
 class ResBlock(nn.Module):
     """
-    Residual block proposed by ResNet.
+    Residual block proposed by ResNet, but here it uses InstanceNorm instead of batch normalization.
 
     See Also: http://torch.ch/blog/2016/02/04/resnets.html
     """
@@ -33,11 +38,11 @@ class ResBlock(nn.Module):
         super().__init__()
         self.net = nn.Sequential(
             nn.Conv2d(in_channels=chan, out_channels=chan, kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm2d(chan),
+            nn.InstanceNorm2d(chan),
             nn.ReLU(inplace=True),
             # nn.Dropout(0.5),
             nn.Conv2d(chan, chan, kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm2d(chan),
+            nn.InstanceNorm2d(chan),
         )
 
     def forward(self, x):
