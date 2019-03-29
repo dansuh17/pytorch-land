@@ -68,20 +68,42 @@ class Monet2PhotoLoaderMaker(DataLoaderMaker):
     """
     def __init__(self, batch_size: int, root_dir='./monet2photo',
                  train_monet_dir='trainA', train_photo_dir='trainB',
-                 test_monet_dir='testA', test_photo_dir='testB', num_workers=8):
+                 test_monet_dir='testA', test_photo_dir='testB',
+                 downsize_half=False, num_workers=8):
         super().__init__()
         self.batch_size = batch_size
         self.root_dir = root_dir
         self.num_workers = num_workers
+
+        # collect path information
         self.train_monet_path = os.path.join(root_dir, train_monet_dir)
         self.train_photo_path = os.path.join(root_dir, train_photo_dir)
         self.test_monet_path = os.path.join(root_dir, test_monet_dir)
         self.test_photo_path = os.path.join(root_dir, test_photo_dir)
 
-        monet2photo_transform = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)),
-        ])
+        # check that all path exists
+        for path in [
+            self.train_monet_path,
+            self.train_photo_path,
+            self.train_monet_path,
+            self.test_photo_path,
+        ]:
+            if not os.path.exists(path):
+                print(f'The path: {path} does not exist!')
+                raise FileNotFoundError(path)
+
+        # downsize 256 x 256 image into half sized images
+        if downsize_half:
+            monet2photo_transform = transforms.Compose([
+                transforms.Resize(size=(128, 128)),
+                transforms.ToTensor(),
+                transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)),
+            ])
+        else:
+            monet2photo_transform = transforms.Compose([
+                transforms.ToTensor(),
+                transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)),
+            ])
 
         # create datasets that will be loaded to each dataloader instances
         self.train_dataset = Monet2PhotoDataset(
@@ -104,7 +126,6 @@ class Monet2PhotoLoaderMaker(DataLoaderMaker):
         self.default_dataloader_kwargs = {
             'pin_memory': True,
             'drop_last': True,
-            'shuffle': True,
             'num_workers': self.num_workers,
             'batch_size': self.batch_size,
         }
@@ -124,6 +145,7 @@ class Monet2PhotoLoaderMaker(DataLoaderMaker):
     def make_test_dataloader(self):
         return data.DataLoader(
             self.test_dataset,
+            shuffle=True,
             **self.default_dataloader_kwargs)
 
 
@@ -138,8 +160,12 @@ if __name__ == '__main__':
         photo_path='./cyclegan/datasets/monet2photo/trainB',
         transform=transform)
 
+    monet2photo_loadermaker = Monet2PhotoLoaderMaker(
+        batch_size=10, root_dir='./cyclegan/datasets/monet2photo/', downsize_half=True)
+    train_dataloader = monet2photo_loadermaker.make_train_dataloader()
+
     # print the size and length of the dataset
-    print(len(monet2photo_dataset))
-    for img_pair in monet2photo_dataset:
+    print(len(train_dataloader))
+    for img_pair in train_dataloader:
         print(img_pair.size())
         break
