@@ -4,18 +4,58 @@ import torch.nn.functional as F
 
 
 class CycleGanGenerator(nn.Module):
+    """
+    CycleGAN Generator module that uses 6 residual blocks,
+    assuming (3 x 128 x 128)-sized input images.
+
+    The network with 6 residual blocks consists of:
+    c7s1-64, d128, d256, R256, R256, R256, R256, R256, R256, u128, u64, c7s1-3
+    """
     def __init__(self):
         super().__init__()
-        # input: (3, w, h) (3, 256, 256) for monet dataset
-        # output: (3, w, h) (3, 256, 256) for monet dataset
+        # input: (3, 128, 128)
+        # output: (3, 128, 128)
+        # TODO: try different types of padding layers - reflection / replication
         self.net = nn.Sequential(
-            nn.Conv2d(in_channels=3, out_channels=64, kernel_size=3, padding=1, bias=False),
+            nn.Conv2d(in_channels=3, out_channels=64, kernel_size=7, padding=3, bias=False),  # out: (b, 64, 128, 128)
             nn.InstanceNorm2d(64),
             nn.ReLU(inplace=True),
+
+            # add downsampling layers
+            nn.Conv2d(64, 128, kernel_size=3, stride=2, padding=1, bias=False),  # (b, 128, 64, 64)
+            nn.InstanceNorm2d(128),
+            nn.ReLU(inplace=True),
+
+            nn.Conv2d(128, 256, 3, 2, 1, bias=False),  # (b, 256, 32, 32)
+            nn.InstanceNorm2d(256),
+            nn.ReLU(inplace=True),
+
+            # add 6 residual blocks
+            ResBlock(256),  # (b, 256, 32, 32)
+            ResBlock(256),  # (b, 256, 32, 32)
+            ResBlock(256),  # (b, 256, 32, 32)
+            ResBlock(256),  # (b, 256, 32, 32)
+            ResBlock(256),  # (b, 256, 32, 32)
+            ResBlock(256),  # (b, 256, 32, 32)
+
+            # add upsampling layers
+            nn.ConvTranspose2d(
+                in_channels=256, out_channels=128,
+                kernel_size=3, stride=2, padding=1, output_padding=1, bias=False),
+            nn.InstanceNorm2d(128),  # (b, 128, 64, 64)
+            nn.ReLU(inplace=True),
+
+            nn.ConvTranspose2d(128, 64, 3, 2, 1, 1, bias=False),
+            nn.InstanceNorm2d(64),  # (b, 64, 128, 128)
+            nn.ReLU(inplace=True),
+
+            # final layer
+            nn.Conv2d(64, 3, 7, padding=3, bias=False),
+            nn.Tanh(),
         )
 
     def forward(self, x):
-        pass
+        return self.net(x)
 
 
 class CycleGanDiscriminator(nn.Module):
@@ -52,6 +92,9 @@ class ResBlock(nn.Module):
 
 
 if __name__ == '__main__':
-    block = ResBlock(10)
-    z = torch.randn((10, 10, 128, 128))
+    block = ResBlock(3)
+    z = torch.randn((10, 3, 128, 128))
     print(block(z).size())
+
+    g = CycleGanGenerator()
+    print(g(z).size())
