@@ -1,6 +1,5 @@
 import torch
 from torch import nn
-import torch.nn.functional as F
 
 
 class CycleGanGenerator(nn.Module):
@@ -17,7 +16,8 @@ class CycleGanGenerator(nn.Module):
         # output: (3, 128, 128)
         # TODO: try different types of padding layers - reflection / replication
         self.net = nn.Sequential(
-            nn.Conv2d(in_channels=3, out_channels=64, kernel_size=7, padding=3, bias=False),  # out: (b, 64, 128, 128)
+            nn.Conv2d(
+                in_channels=3, out_channels=64, kernel_size=7, padding=3, bias=False),  # out: (b, 64, 128, 128)
             nn.InstanceNorm2d(64),
             nn.ReLU(inplace=True),
 
@@ -59,13 +59,68 @@ class CycleGanGenerator(nn.Module):
 
 
 class CycleGanDiscriminator(nn.Module):
+    """
+    CycleGAN Discriminator module.
+    Implements a 70 x 70 PatchGAN.
+
+    "
+    Let Ck denote a 4x4 convolution-InstanceNorm-LeakyReLU layer with k filters and stride 2.
+    ...
+
+    The discriminator architecture is:
+    C64, C128, C256, C512
+    "
+
+    The number "70" comes by tracing back the receptive field size that will result as 1 x 1 output.
+    That is, the convolutional network here is mathematically equivalent to
+    "chopp(ing) up the image into 70 x 70 overlapping patches" and mapping each patch to a 1 x 1 output.
+
+    The equation goes: receptive = (output_size - 1) * stride + kernel_size
+
+    See Also:
+        https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix/issues/39
+        https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix/blob/master/models/networks.py#L532
+        https://github.com/phillipi/pix2pix/blob/master/scripts/receptive_field_sizes.m
+
+    (1, 1) -> (4, 4) -> (7, 7) -> (16, 16) -> (34, 34) -> (70, 70)
+    """
     def __init__(self):
         super().__init__()
-        # input: (3, w, h)
-        # output: 70 by 70 patchGANs
+        # input: (3, 128, 128)
+        self.net = nn.Sequential(
+            # patch: (70 x 70)
+            nn.Conv2d(
+                in_channels=3, out_channels=64,
+                kernel_size=4, stride=2, padding=1, bias=False),  # out: (b, 64, 64, 64)
+            # "We do not use InstanceNorm for the first C64 layer"
+            nn.LeakyReLU(0.2, inplace=True),
+
+            # patch: (34 x 34)
+            nn.Conv2d(64, 128, 4, 2, 1, bias=False),  # (b, 128, 32, 32)
+            nn.InstanceNorm2d(128),
+            nn.LeakyReLU(0.2, inplace=True),
+
+            # patch: (16 x 16)
+            nn.Conv2d(128, 256, 4, 2, 1, bias=False),  # (b, 256, 16, 16)
+            nn.InstanceNorm2d(256),
+            nn.LeakyReLU(0.2, inplace=True),
+
+            # patch: (7 x 7)
+            nn.Conv2d(256, 512, 4, 2, 1, bias=False),  # (b, 512, 8, 8)
+            nn.InstanceNorm2d(512),
+            nn.LeakyReLU(0.2, inplace=True),
+
+            # patch: (4 x 4)
+            nn.Conv2d(512, 256, 4, 1, 1, bias=False),  # (b, 256, 7, 7)
+            nn.InstanceNorm2d(256),
+            nn.LeakyReLU(0.2, inplace=True),
+
+            # patch: (1 x 1)
+            nn.Conv2d(256, 1, 4, 1, 1, bias=False),  # (b, 1, 6, 6)
+        )
 
     def forward(self, x):
-        pass
+        return self.net(x)
 
 
 class ResBlock(nn.Module):
@@ -86,9 +141,13 @@ class ResBlock(nn.Module):
         )
 
     def forward(self, x):
-        # TODO: no ReLU layer at the end of Residual Block - it shows slightly better performance.
-        # TODO: See also: http://torch.ch/blog/2016/02/04/resnets.html
-        return F.relu(x + self.net(x), inplace=True)
+        """
+        No ReLU layer at the end of Residual Block - it shows slightly better performance.
+
+        See Also:
+            http://torch.ch/blog/2016/02/04/resnets.html
+        """
+        return x + self.net(x)
 
 
 if __name__ == '__main__':
@@ -98,3 +157,6 @@ if __name__ == '__main__':
 
     g = CycleGanGenerator()
     print(g(z).size())
+
+    d = CycleGanDiscriminator()
+    print(d(z).size())
