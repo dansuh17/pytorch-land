@@ -8,7 +8,7 @@ from enum import Enum, unique
 from collections import defaultdict, namedtuple
 import torch
 import torch.nn as nn
-from torch.optim import optimizer
+from torch import optim
 from torch.optim.optimizer import Optimizer
 from datasets.loader_maker import DataLoaderMaker
 from tensorboardX import SummaryWriter
@@ -239,9 +239,9 @@ class NetworkTrainer(ABC):
     @abstractmethod
     def run_step(self,
                  model: Dict[str, ModelInfo],
-                 criteria,
-                 optimizer,
-                 input_,
+                 criteria: Dict[str, nn.modules.loss._Loss],
+                 optimizer: Dict[str, Optimizer],
+                 input_: torch.Tensor,
                  train_stage: TrainStage,
                  *args, **kwargs):
         """
@@ -489,7 +489,7 @@ class NetworkTrainer(ABC):
     @staticmethod
     def save_learning_rate(
             writer,
-            optimizers: Dict[str, optimizer.Optimizer],
+            optimizers: Dict[str, Optimizer],
             step: int):
         for opt in optimizers.values():
             for idx, param_group in enumerate(opt.param_groups):

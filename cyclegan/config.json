@@ -1,0 +1,9 @@
+{
+  "batch_size": 128,
+  "data_root": "./cyclegan/datasets/monet2photo",
+  "epoch": 200,
+  "lr": 0.0002,
+  "use_id_loss": false,
+  "cycle_loss_lambda": 10,
+  "id_loss_lambda": 5
+}

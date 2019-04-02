@@ -168,4 +168,5 @@ if __name__ == '__main__':
     print(len(train_dataloader))
     for img_pair in train_dataloader:
         print(img_pair.size())
+        print(img_pair[:, 1, :, :].size())
         break
