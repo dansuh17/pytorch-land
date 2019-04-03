@@ -220,6 +220,14 @@ class CycleGANTrainer(NetworkTrainer):
             self.log_images(gen_photo, nrow=self.display_imgs, name='photo_gen')
 
     def log_images(self, imgs, nrow, name: str):
+        """
+        Save images to the summary writer.
+
+        Args:
+            imgs (torch.Tensor): image tensors
+            nrow (int): number of images to save
+            name (str): name for the images
+        """
         grid = torchvision.utils.make_grid(imgs[:nrow, :], nrow=nrow, normalize=True)
         self.writer.add_image(f'{self.epoch}/{name}', grid, self.train_step)
 
