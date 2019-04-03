@@ -150,7 +150,8 @@ class NetworkTrainer(ABC):
 
         # initialize training process
         self.epoch = 0
-        self.train_step = 0
+        self.global_step = 0  # total steps run
+        self.local_step = 0  # local step within a single epoch
 
     def _validate_model_dict(self, models: Dict[str, ModelInfo]):
         if not isinstance(models, dict):
@@ -273,8 +274,9 @@ class NetworkTrainer(ABC):
         self.before_epoch(train_stage=train_stage)
 
         metric_manager = MetricManager()  # initialize the metric manager
-        dataloader_size = len(dataloader)
+        dataset_size = len(dataloader)
         for step, input_ in enumerate(dataloader):
+            self.local_step = step
             input_ = self._to_device(self.input_transform(input_))  # transform dataloader's data
 
             # run a single step
@@ -292,16 +294,18 @@ class NetworkTrainer(ABC):
             metric_manager.append_metric(metric)
 
             # perform any action required after running the step
-            self.post_step(input_, output, metric, train_stage=train_stage)
+            self.post_step(
+                input_, output, metric, dataset_size=dataset_size, train_stage=train_stage)
 
             # update train step if training
             if train_stage == TrainStage.TRAIN:
-                self.train_step += 1
+                self.global_step += 1
 
             # run pre-epoch-finish after the final step
-            if step == dataloader_size - 1:
+            if step == dataset_size - 1:
                 self.pre_epoch_finish(input_, output, metric_manager, train_stage=train_stage)
-        self.on_epoch_finish(metric_manager, train_stage=train_stage)
+        self.on_epoch_finish(
+            metric_manager, dataset_size=dataset_size, train_stage=train_stage)
         return metric_manager
 
     def test(self):
@@ -329,27 +333,35 @@ class NetworkTrainer(ABC):
     def before_epoch(self, train_stage: TrainStage):
         # store the epoch number (to look good in tensorboard), and learning rate
         if train_stage == TrainStage.TRAIN:
-            self.writer.add_scalar('epoch', self.epoch, self.train_step)
-            self.save_learning_rate(self.writer, self.optimizers, self.train_step)
+            self.writer.add_scalar('epoch', self.epoch, self.global_step)
+            self.save_learning_rate(self.writer, self.optimizers, self.global_step)
 
-    def post_step(self, input, output, metric: dict, train_stage: TrainStage):
+    def post_step(
+            self, input, output, metric: dict,
+            dataset_size: int, train_stage: TrainStage):
         if train_stage == TrainStage.TRAIN:
-            if self.train_step % 20 == 0:
-                self.log_metric(self.writer, metric, self.epoch, self.train_step)
+            if self.global_step % 20 == 0:
+                self.log_metric(
+                    self.writer, metric, self.epoch,
+                    self.local_step, dataset_size, self.global_step)
 
-            if self.train_step % 500 == 0:  # save models
+            if self.global_step % 500 == 0:  # save models
                 self._save_module_summary_all()
 
-    def pre_epoch_finish(self, input_, output, metric_manager: MetricManager, train_stage: TrainStage):
+    def pre_epoch_finish(
+            self, input_, output, metric_manager: MetricManager, train_stage: TrainStage):
         pass
 
-    def on_epoch_finish(self, metric_manager: MetricManager, train_stage: TrainStage):
+    def on_epoch_finish(
+            self, metric_manager: MetricManager, dataset_size: int, train_stage: TrainStage):
         if train_stage == TrainStage.VALIDATE or train_stage == TrainStage.TEST:
             self.log_metric(
                 self.writer,
                 metric_manager.metric_avgs,
                 self.epoch,
-                self.train_step,
+                self.global_step,
+                self.local_step,
+                dataset_size=dataset_size,
                 summary_group=train_stage.value)
 
         if train_stage == TrainStage.TRAIN:
@@ -375,7 +387,7 @@ class NetworkTrainer(ABC):
 
         train_state = {
             'epoch': self.epoch,
-            'step': self.train_step,
+            'step': self.global_step,
             'seed': self.seed,
             'models': model_state,  # tuple of states (even for len == 1)
             'optimizers': optimizer_state,  # tuple of states
@@ -394,7 +406,7 @@ class NetworkTrainer(ABC):
         self.seed = cpt['seed']
         torch.manual_seed(self.seed)
         self.epoch = cpt['epoch']
-        self.train_step = cpt['step']
+        self.global_step = cpt['step']
 
         # load the model and optimizer
         model_state = cpt['models']
@@ -477,12 +489,14 @@ class NetworkTrainer(ABC):
             torch.save(module, path)
 
     @staticmethod
-    def log_metric(writer, metrics: dict, epoch: int, step: int, summary_group='train'):
-        log = f'Epoch ({summary_group}): {epoch:03}  step: {step}\t'
+    def log_metric(
+            writer, metrics: dict, epoch: int,
+            global_step: int, local_step: int, dataset_size: int, summary_group='train'):
+        log = f'Epoch ({summary_group}): {epoch:03} ({local_step}/{dataset_size}) global_step: {global_step}\t'
         for metric_name, val in metrics.items():
             log += f'{metric_name}: {val:.06f}    '
             # write to summary writer
-            writer.add_scalar(f'{summary_group}/{metric_name}', val, step)
+            writer.add_scalar(f'{summary_group}/{metric_name}', val, global_step)
         print(log)
 
     @staticmethod
@@ -498,7 +512,7 @@ class NetworkTrainer(ABC):
     def _save_module_summary_all(self, **kwargs):
         for model_name, model_info in self.models.items():
             self._save_module_summary(
-                self.writer, model_name, model_info.model.module, self.train_step, **kwargs)
+                self.writer, model_name, model_info.model.module, self.global_step, **kwargs)
 
     @staticmethod
     def _save_module_summary(
