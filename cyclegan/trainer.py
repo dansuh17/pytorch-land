@@ -27,17 +27,19 @@ class CycleGANTrainer(NetworkTrainer):
         self.cycle_loss_lambda = config['cycle_loss_lambda']  # typically 10
         if self.use_id_loss:
             self.id_loss_lambda = config['id_loss_lambda']  # typically 5
-        self.num_devices = 4
+        self.num_devices = config['num_device']
         self.display_imgs = 10
 
         loader_maker = Monet2PhotoLoaderMaker(
-            self.batch_size, self.data_root_dir, downsize_half=True)
-        img_size = (3, 128, 128)
+            self.batch_size, self.data_root_dir, downsize_half=True, num_workers=4)
+        img_size = loader_maker.img_size
 
         g = CycleGanGenerator()
         f = CycleGanGenerator()
         d_x = CycleGanDiscriminator()
         d_y = CycleGanDiscriminator()
+
+        self.d_out_size = CycleGanDiscriminator.output_size
 
         models = {
             'CycleGAN_G': ModelInfo(
@@ -89,8 +91,9 @@ class CycleGANTrainer(NetworkTrainer):
         # input size: (batch_num, 2, channel, height, width)
         monet_imgs, photo_imgs = input_[:, 0, :, :], input_[:, 1, :, :]
 
-        ones = torch.ones((self.batch_size, 6, 6)).to(self.device)
-        zeros = torch.zeros((self.batch_size, 6, 6)).to(self.device)
+        # (b, 1, 6, 6)
+        ones = torch.ones((self.batch_size, ) + self.d_out_size).to(self.device)
+        zeros = torch.zeros((self.batch_size, ) + self.d_out_size).to(self.device)
 
         # parse models
         G = model['CycleGAN_G'].model

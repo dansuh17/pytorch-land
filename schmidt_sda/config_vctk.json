@@ -7,5 +7,6 @@
   "lr_init": 0.001,
   "input_channel": 1,
   "input_width": 40,
-  "input_height": 40
+  "input_height": 40,
+  "num_device": 4
 }

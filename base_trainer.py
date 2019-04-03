@@ -454,8 +454,8 @@ class NetworkTrainer(ABC):
 
     def _save_all_modules(self):
         for model_info in self.models.values():
-            self._save_module(model_info.model.module,
-                              model_info.input_size)
+            self._save_module(
+                model_info.model.module, model_info.input_size)
 
     def _save_module(self, module, input_size: tuple, save_onnx=False, prefix=''):
         """

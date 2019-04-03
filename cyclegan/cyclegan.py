@@ -62,7 +62,7 @@ class CycleGanGenerator(nn.Module):
     @staticmethod
     def init_weights(m):
         if isinstance(m, nn.ConvTranspose2d) or isinstance(m, nn.Conv2d):
-            nn.init.kaiming_normal(m.weight)
+            nn.init.kaiming_normal_(m.weight)
             if m.bias is not None:
                 nn.init.constant_(m.bias, 0)
 
@@ -93,6 +93,8 @@ class CycleGanDiscriminator(nn.Module):
 
     (1, 1) -> (4, 4) -> (7, 7) -> (16, 16) -> (34, 34) -> (70, 70)
     """
+    output_size = (1, 6, 6)
+
     def __init__(self):
         super().__init__()
         # input: (3, 128, 128)
@@ -136,7 +138,7 @@ class CycleGanDiscriminator(nn.Module):
     @staticmethod
     def init_weights(m):
         if isinstance(m, nn.Conv2d):
-            nn.init.kaiming_normal(m.weight)
+            nn.init.kaiming_normal_(m.weight)
             if m.bias is not None:
                 nn.init.constant_(m.bias, 0)
 
@@ -172,7 +174,7 @@ class ResBlock(nn.Module):
     @staticmethod
     def init_weights(m):
         if isinstance(m, nn.Conv2d):
-            nn.init.kaiming_normal(m.weight)
+            nn.init.kaiming_normal_(m.weight)
             if m.bias is not None:
                 nn.init.constant_(m.bias, 0)
 
