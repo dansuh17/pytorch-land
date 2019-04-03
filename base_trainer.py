@@ -8,7 +8,6 @@ from enum import Enum, unique
 from collections import defaultdict, namedtuple
 import torch
 import torch.nn as nn
-from torch import optim
 from torch.optim.optimizer import Optimizer
 from datasets.loader_maker import DataLoaderMaker
 from tensorboardX import SummaryWriter
@@ -87,8 +86,8 @@ class NetworkTrainer(ABC):
     def __init__(self,
                  models: Dict[str, ModelInfo],
                  dataloader_maker: DataLoaderMaker,
-                 criterion,
-                 optimizer,
+                 criterion: Dict[str, nn.modules.loss._Loss],
+                 optimizer: Dict[str, Optimizer],
                  epoch: int,
                  output_dir='data_out',
                  num_devices=1,
@@ -101,8 +100,8 @@ class NetworkTrainer(ABC):
             models (Dict[str, ModelInfo]): network model(s)
             dataloader_maker (DataLoaderMaker): instance creating dataloaders
             criterion: training criterion (a.k.a. loss function)
-            optimizer (Optimizer | tuple[Optimizer]): gradient descent optimizer
-            epoch: total epochs to train (the end epoch)
+            optimizer (Dict[str, Optimizer]): gradient descent optimizer
+            epoch (int): total epochs to train (the end epoch)
             output_dir (str): root output directory
             num_devices (int): number of GPU devices to split the batch
             seed (int): random seed to use
@@ -117,7 +116,7 @@ class NetworkTrainer(ABC):
         else:
             self.seed = seed
             torch.manual_seed(seed)
-        print('Using random seed : {}'.format(self.seed))
+        print(f'Using random seed : {self.seed}')
 
         # training devices to use
         self.device_ids = list(range(num_devices))
@@ -211,7 +210,7 @@ class NetworkTrainer(ABC):
 
     def fit(self, use_val_metric=True):
         """Run the entire training process."""
-        print('Using validation metric for best model : {}'.format(use_val_metric))
+        print(f'Using validation metric for best model : {use_val_metric}')
         best_metric = None
         for _ in range(self.epoch, self.total_epoch):
             train_metrics = self.train()
@@ -251,7 +250,7 @@ class NetworkTrainer(ABC):
         Args:
             model (Dict[str, ModelInfo]): models to train
             criteria: model criteria functions
-            optimizer (Dict[str, nn.Optimizer]): model optimizers
+            optimizer (Dict[str, Optimizer]): model optimizers
             input_ (torch.Tensor | tuple[torch.Tensor]): inputs to models
             train_stage (TrainStage): enum indicating which stage of training it is going through
 
@@ -381,7 +380,7 @@ class NetworkTrainer(ABC):
             'models': model_state,  # tuple of states (even for len == 1)
             'optimizers': optimizer_state,  # tuple of states
         }
-        cptf = '{}{}_checkpoint_e{}.pth'.format(prefix, self.trainer_name, self.epoch)
+        cptf = f'{prefix}{self.trainer_name}_checkpoint_e{self.epoch}.pth'
         torch.save(train_state, os.path.join(self.checkpoint_dir, cptf))
 
     def resume(self, filename: str):
@@ -439,7 +438,7 @@ class NetworkTrainer(ABC):
                 try:
                     self._save_module(model.module, input_size, save_onnx=True, prefix='best_')
                 except RuntimeError as onnx_err:
-                    print('Saving onnx model failed : {}'.format(onnx_err))
+                    print(f'Saving onnx model failed : {onnx_err}')
                 self._save_module(model.module, input_size, prefix='best')
                 best_metric.set_mean(compare_metric, curr_metric.mean(compare_metric))
         return best_metric
@@ -462,7 +461,7 @@ class NetworkTrainer(ABC):
         if save_onnx:
             import onnx
             # TODO: input / output names?
-            path = os.path.join(self.onnx_dir, '{}{}_onnx.pth'.format(prefix, module.__class__.__name__))
+            path = os.path.join(self.onnx_dir, f'{prefix}{module.__class__.__name__}_onnx.pth')
             # add batch dimension to the dummy input sizes
             dummy_input = torch.randn((1, ) + input_size).to(self.device)
             torch.onnx.export(module, dummy_input, path, verbose=True)
@@ -473,17 +472,17 @@ class NetworkTrainer(ABC):
         else:
             # note epoch for default prefix
             if prefix == '':
-                prefix = 'e{:03}'.format(self.epoch)
-            path = os.path.join(self.model_dir, '{}_{}.pth'.format(prefix, module.__class__.__name__))
+                prefix = f'e{self.epoch:03}'
+            path = os.path.join(self.model_dir, f'{prefix}_{module.__class__.__name__}.pth')
             torch.save(module, path)
 
     @staticmethod
     def log_metric(writer, metrics: dict, epoch: int, step: int, summary_group='train'):
-        log = 'Epoch ({}): {:03}  step: {}\t'.format(summary_group, epoch, step)
+        log = f'Epoch ({summary_group}): {epoch:03}  step: {step}\t'
         for metric_name, val in metrics.items():
-            log += '{}: {:.06f}   '.format(metric_name, val)
+            log += f'{metric_name}: {val:.06f}    '
             # write to summary writer
-            writer.add_scalar('{}/{}'.format(summary_group, metric_name), val, step)
+            writer.add_scalar(f'{summary_group}/{metric_name}', val, step)
         print(log)
 
     @staticmethod
@@ -497,38 +496,37 @@ class NetworkTrainer(ABC):
                 writer.add_scalar('lr/{}'.format(idx), lr, step)
 
     def _save_module_summary_all(self, **kwargs):
-        for model_info in self.models.values():
-            self._save_module_summary(self.writer,
-                                      model_info.model.module,
-                                      self.train_step,
-                                      **kwargs)
+        for model_name, model_info in self.models.items():
+            self._save_module_summary(
+                self.writer, model_name, model_info.model.module, self.train_step, **kwargs)
 
     @staticmethod
-    def _save_module_summary(writer, module: nn.Module, step: int,
-                             save_histogram=False, verbose=False):
+    def _save_module_summary(
+            writer, module_name: str, module: nn.Module, step: int,
+            save_histogram=False, verbose=False):
         # warning: saving histograms is expensive - both time and space
-        module_name = module.__class__.__name__  # to distinguish among different modules
+        if module_name == '' or module_name is None:
+            module_name = module.__class__.__name__  # to distinguish among different modules
+
         with torch.no_grad():
             for p_name, parameter in module.named_parameters():
                 if parameter.grad is not None:
                     avg_grad = torch.mean(parameter.grad)
                     if verbose:
-                        print('\tavg_grad for {}_{} = {:.6f}'.format(p_name, module_name, avg_grad))
-                    writer.add_scalar(
-                        'avg_grad/{}_{}'.format(module_name, p_name), avg_grad.item(), step)
+                        print(f'\tavg_grad for {p_name}_{module_name} = {avg_grad:.6f}')
+                    writer.add_scalar(f'avg_grad/{module_name}_{p_name}', avg_grad.item(), step)
                     if save_histogram:
                         writer.add_histogram(
-                            'grad/{}_{}'.format(module_name, p_name), parameter.grad.cpu().numpy(), step)
+                            f'grad/{module_name}_{p_name}', parameter.grad.cpu().numpy(), step)
 
                 if parameter.data is not None:
                     avg_weight = torch.mean(parameter.data)
                     if verbose:
-                        print('\tavg_weight for {}_{} = {:.6f}'.format(module_name, p_name, avg_weight))
-                    writer.add_scalar(
-                        'avg_weight/{}_{}'.format(module_name, p_name), avg_weight.item(), step)
+                        print(f'\tavg_weight for {module_name}_{p_name} = {avg_weight:.6f}')
+                    writer.add_scalar(f'avg_weight/{module_name}_{p_name}', avg_weight.item(), step)
                     if save_histogram:
                         writer.add_histogram(
-                            'weight/{}_{}'.format(module_name, p_name), parameter.data.cpu().numpy(), step)
+                            f'weight/{module_name}_{p_name}', parameter.data.cpu().numpy(), step)
 
     def _to_device(self, data):
         """
