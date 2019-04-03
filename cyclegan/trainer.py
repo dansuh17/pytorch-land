@@ -229,7 +229,7 @@ class CycleGANTrainer(NetworkTrainer):
             name (str): name for the images
         """
         grid = torchvision.utils.make_grid(imgs[:nrow, :], nrow=nrow, normalize=True)
-        self.writer.add_image(f'{self.epoch}/{name}', grid, self.train_step)
+        self.writer.add_image(f'{self.epoch}/{name}', grid, self.global_step)
 
 
 if __name__ == '__main__':
