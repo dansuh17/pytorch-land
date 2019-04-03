@@ -342,8 +342,8 @@ class NetworkTrainer(ABC):
         if train_stage == TrainStage.TRAIN:
             if self.global_step % 20 == 0:
                 self.log_metric(
-                    self.writer, metric, self.epoch,
-                    self.local_step, dataset_size, self.global_step)
+                    self.writer, metric, self.epoch, self.global_step,
+                    self.local_step, dataset_size, train_stage.value)
 
             if self.global_step % 500 == 0:  # save models
                 self._save_module_summary_all()
@@ -356,11 +356,8 @@ class NetworkTrainer(ABC):
             self, metric_manager: MetricManager, dataset_size: int, train_stage: TrainStage):
         if train_stage == TrainStage.VALIDATE or train_stage == TrainStage.TEST:
             self.log_metric(
-                self.writer,
-                metric_manager.metric_avgs,
-                self.epoch,
-                self.global_step,
-                self.local_step,
+                self.writer, metric_manager.metric_avgs, self.epoch,
+                self.global_step, self.local_step,
                 dataset_size=dataset_size,
                 summary_group=train_stage.value)
 
