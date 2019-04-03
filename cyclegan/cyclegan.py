@@ -54,8 +54,17 @@ class CycleGanGenerator(nn.Module):
             nn.Tanh(),
         )
 
+        self.apply(self.init_weights)
+
     def forward(self, x):
         return self.net(x)
+
+    @staticmethod
+    def init_weights(m):
+        if isinstance(m, nn.ConvTranspose2d) or isinstance(m, nn.Conv2d):
+            nn.init.kaiming_normal(m.weight)
+            if m.bias is not None:
+                nn.init.constant_(m.bias, 0)
 
 
 class CycleGanDiscriminator(nn.Module):
@@ -119,8 +128,17 @@ class CycleGanDiscriminator(nn.Module):
             nn.Conv2d(256, 1, 4, 1, 1, bias=False),  # (b, 1, 6, 6)
         )
 
+        self.apply(self.init_weights)
+
     def forward(self, x):
         return self.net(x)
+
+    @staticmethod
+    def init_weights(m):
+        if isinstance(m, nn.Conv2d):
+            nn.init.kaiming_normal(m.weight)
+            if m.bias is not None:
+                nn.init.constant_(m.bias, 0)
 
 
 class ResBlock(nn.Module):
@@ -140,6 +158,8 @@ class ResBlock(nn.Module):
             nn.InstanceNorm2d(chan),
         )
 
+        self.apply(self.init_weights)
+
     def forward(self, x):
         """
         No ReLU layer at the end of Residual Block - it shows slightly better performance.
@@ -148,6 +168,13 @@ class ResBlock(nn.Module):
             http://torch.ch/blog/2016/02/04/resnets.html
         """
         return x + self.net(x)
+
+    @staticmethod
+    def init_weights(m):
+        if isinstance(m, nn.Conv2d):
+            nn.init.kaiming_normal(m.weight)
+            if m.bias is not None:
+                nn.init.constant_(m.bias, 0)
 
 
 if __name__ == '__main__':
