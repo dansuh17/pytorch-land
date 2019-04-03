@@ -5,6 +5,7 @@ from torch import nn
 from torch import optim
 from torch.nn.modules.loss import _Loss
 from torch.optim.optimizer import Optimizer
+import torchvision
 from cyclegan.cyclegan import CycleGanDiscriminator, CycleGanGenerator
 from datasets.img_transfer import Monet2PhotoLoaderMaker
 from base_trainer import NetworkTrainer, ModelInfo, TrainStage
@@ -27,6 +28,7 @@ class CycleGANTrainer(NetworkTrainer):
         if self.use_id_loss:
             self.id_loss_lambda = config['id_loss_lambda']  # typically 5
         self.num_devices = 4
+        self.display_imgs = 10
 
         loader_maker = Monet2PhotoLoaderMaker(
             self.batch_size, self.data_root_dir, downsize_half=True)
@@ -207,6 +209,19 @@ class CycleGANTrainer(NetworkTrainer):
         if len(loss) == 6:
             metrics['id_loss'] = loss[5].item()
         return metrics
+
+    def pre_epoch_finish(self, input_, output, metric_manager, train_stage: TrainStage):
+        # save images at the end of validation step
+        if train_stage == TrainStage.VALIDATE:
+            monet_imgs, photo_imgs, gen_monet, gen_photo = output
+            self.log_images(monet_imgs, nrow=self.display_imgs, name='monet_real')
+            self.log_images(photo_imgs, nrow=self.display_imgs, name='photo_real')
+            self.log_images(gen_monet, nrow=self.display_imgs, name='monet_gen')
+            self.log_images(gen_photo, nrow=self.display_imgs, name='photo_gen')
+
+    def log_images(self, imgs, nrow, name: str):
+        grid = torchvision.utils.make_grid(imgs[:nrow, :], nrow=nrow, normalize=True)
+        self.writer.add_image(f'{self.epoch}/{name}', grid, self.train_step)
 
 
 if __name__ == '__main__':
