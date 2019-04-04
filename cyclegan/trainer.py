@@ -28,16 +28,17 @@ class CycleGANTrainer(NetworkTrainer):
         if self.use_id_loss:
             self.id_loss_lambda = config['id_loss_lambda']  # typically 5
         self.num_devices = config['num_device']
-        self.display_imgs = 10
+        self.display_imgs = 10  # display 10 sample images per epoch
 
         loader_maker = Monet2PhotoLoaderMaker(
             self.batch_size, self.data_root_dir, downsize_half=True, num_workers=4)
-        img_size = loader_maker.img_size
+        img_size = loader_maker.img_size  # input size
 
-        g = CycleGanGenerator()
-        f = CycleGanGenerator()
-        d_x = CycleGanDiscriminator()
-        d_y = CycleGanDiscriminator()
+        # create models
+        g = CycleGanGenerator()  # monet -> photo generator
+        f = CycleGanGenerator()  # photo -> monet generator
+        d_x = CycleGanDiscriminator()  # monet discriminator
+        d_y = CycleGanDiscriminator()  # photo discriminator
 
         self.d_out_size = CycleGanDiscriminator.output_size
 
@@ -45,7 +46,7 @@ class CycleGANTrainer(NetworkTrainer):
             'CycleGAN_G': ModelInfo(
                 model=g,
                 input_size=img_size,
-                metric='loss_g',
+                metric='loss_g',  # used for saving the 'best' model
                 comparison=operator.lt,
             ),
             'CycleGAN_F': ModelInfo(

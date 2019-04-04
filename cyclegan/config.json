@@ -5,5 +5,6 @@
   "lr": 0.0002,
   "use_id_loss": false,
   "cycle_loss_lambda": 10,
-  "id_loss_lambda": 5
+  "id_loss_lambda": 5,
+  "num_device": 4
 }
