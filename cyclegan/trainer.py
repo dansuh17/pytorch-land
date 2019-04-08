@@ -120,6 +120,16 @@ class CycleGANTrainer(NetworkTrainer):
             g_loss.backward()
             g_optim.step()
 
+        ### Train F ###
+        gen_monet = F(photo_imgs)
+        monet_gen_score = Dx(gen_monet)
+        f_loss = mse_loss(monet_gen_score, ones)
+
+        if train_stage == TrainStage.TRAIN:
+            f_optim.zero_grad()
+            f_loss.backward()
+            f_optim.step()
+
         ### Train Dy (photo discriminator) ###
         gen_photos = G(monet_imgs)
         photo_gen_score = Dy(gen_photos.detach())
@@ -133,19 +143,9 @@ class CycleGANTrainer(NetworkTrainer):
             d_y_loss.backward()
             d_y_optim.step()
 
-        ### Train F ###
-        gen_monet = F(photo_imgs)
-        monet_gen_score = Dx(gen_monet)
-        f_loss = mse_loss(monet_gen_score, ones)
-
-        if train_stage == TrainStage.TRAIN:
-            f_optim.zero_grad()
-            f_loss.backward()
-            f_optim.step()
-
         ### Train Dx (monet discriminator) ###
         gen_monet = F(photo_imgs)
-        monet_gen_score = Dx(gen_monet)
+        monet_gen_score = Dx(gen_monet.detach())
         monet_real_score = Dx(monet_imgs)
         d_x_loss_real = mse_loss(monet_real_score, ones)
         d_x_loss_fake = mse_loss(monet_gen_score, zeros)
