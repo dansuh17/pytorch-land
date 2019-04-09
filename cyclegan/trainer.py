@@ -110,7 +110,7 @@ class CycleGANTrainer(NetworkTrainer):
         d_x_optim = optimizer['optimizer_d_x']
         d_y_optim = optimizer['optimizer_d_y']
 
-        ### Train G ###
+        ### Train G (Photo generator) ###
         gen_photos = G(monet_imgs)
         photo_gen_score = Dy(gen_photos)
         g_loss = mse_loss(photo_gen_score, ones)
@@ -120,7 +120,7 @@ class CycleGANTrainer(NetworkTrainer):
             g_loss.backward()
             g_optim.step()
 
-        ### Train F ###
+        ### Train F (Monet generator) ###
         gen_monet = F(photo_imgs)
         monet_gen_score = Dx(gen_monet)
         f_loss = mse_loss(monet_gen_score, ones)
@@ -158,24 +158,22 @@ class CycleGANTrainer(NetworkTrainer):
 
         ### Cycle-Consistency Loss
         # monet -> photo -> monet
-        gen_photo = G(monet_imgs)
-        monet_reconstructed = F(gen_photo)
+        monet_reconstructed = F(G(monet_imgs))
         # cycle consistency loss for F(G(x))
         cycle_fg = l1_loss(monet_imgs, monet_reconstructed)
 
         # photo -> monet -> photo
-        gen_monet = F(photo_imgs)
-        photo_reconstructed = G(gen_monet)
+        photo_reconstructed = G(F(photo_imgs))
         cycle_gf = l1_loss(photo_imgs, photo_reconstructed)
 
         cycle_loss = self.cycle_loss_lambda * (cycle_fg + cycle_gf)
 
         if train_stage == TrainStage.TRAIN:
-            g_optim.zero_grad()
             f_optim.zero_grad()
+            g_optim.zero_grad()
             cycle_loss.backward()
-            g_optim.step()
             f_optim.step()
+            g_optim.step()
 
         ### Identity Mapping Loss
         if self.use_id_loss:
@@ -223,7 +221,7 @@ class CycleGANTrainer(NetworkTrainer):
             self.log_images(gen_monet, nrow=self.display_imgs, name='monet_gen')
             self.log_images(gen_photo, nrow=self.display_imgs, name='photo_gen')
 
-    def log_images(self, imgs, nrow, name: str):
+    def log_images(self, imgs, nrow: int, name: str):
         """
         Save images to the summary writer.
 

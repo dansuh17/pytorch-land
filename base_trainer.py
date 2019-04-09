@@ -327,7 +327,7 @@ class NetworkTrainer(ABC):
             model.to(self.device), device_ids=self.device_ids)
 
     @staticmethod
-    def make_performance_metric(input_, output, loss) -> dict:
+    def make_performance_metric(input_: torch.Tensor, output, loss) -> dict:
         return {'loss': loss.item()}
 
     def before_epoch(self, train_stage: TrainStage):
@@ -349,7 +349,11 @@ class NetworkTrainer(ABC):
                 self._save_module_summary_all()
 
     def pre_epoch_finish(
-            self, input_, output, metric_manager: MetricManager, train_stage: TrainStage):
+            self,
+            input_: torch.Tensor,
+            output: tuple,
+            metric_manager: MetricManager,
+            train_stage: TrainStage):
         pass
 
     def on_epoch_finish(
