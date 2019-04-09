@@ -163,14 +163,13 @@ class CycleGANTrainer(NetworkTrainer):
         d_x_loss = d_x_loss_real + d_x_loss_fake
 
         if train_stage == TrainStage.TRAIN:
-            d_y_optim.zero_grad()
             d_x_optim.zero_grad()
-
-            d_y_loss.backward()
             d_x_loss.backward()
-
-            d_y_optim.step()
             d_x_optim.step()
+
+            d_y_optim.zero_grad()
+            d_y_loss.backward()
+            d_y_optim.step()
 
         ### Identity Mapping Loss
         if self.use_id_loss:
