@@ -137,14 +137,13 @@ class CycleGANTrainer(NetworkTrainer):
 
         cycle_loss = self.cycle_loss_lambda * (cycle_gf + cycle_fg)
 
+        # add all generator losses
+        generator_loss = g_loss + f_loss + cycle_loss
+
         if train_stage == TrainStage.TRAIN:
             g_optim.zero_grad()
             f_optim.zero_grad()
-
-            g_loss.backward()
-            f_loss.backward()
-            cycle_loss.backward()
-
+            generator_loss.backward()
             g_optim.step()
             f_optim.step()
 
