@@ -90,7 +90,7 @@ class CycleGANTrainer(NetworkTrainer):
                  train_stage: TrainStage,
                  *args, **kwargs):
         # input size: (batch_num, 2, channel, height, width)
-        monet_imgs, photo_imgs = input_[:, 0, :, :], input_[:, 1, :, :]
+        monet_real, photo_real = input_[:, 0, :, :], input_[:, 1, :, :]
 
         # (b, 1, 6, 6)
         ones = torch.ones((self.batch_size, ) + self.d_out_size).to(self.device)
@@ -110,78 +110,76 @@ class CycleGANTrainer(NetworkTrainer):
         d_x_optim = optimizer['optimizer_d_x']
         d_y_optim = optimizer['optimizer_d_y']
 
-        ### Train G (Photo generator) ###
-        gen_photos = G(monet_imgs)
-        photo_gen_score = Dy(gen_photos)
+        ### Generate images
+        # monet -> photo
+        gen_photo = G(monet_real)
+
+        # photo -> monet
+        gen_monet = F(photo_real)
+
+        ### Train generators
+        # G: monet->photo
+        photo_gen_score = Dy(gen_photo)
         g_loss = mse_loss(photo_gen_score, ones)
 
-        if train_stage == TrainStage.TRAIN:
-            g_optim.zero_grad()
-            g_loss.backward()
-            g_optim.step()
-
-        ### Train F (Monet generator) ###
-        gen_monet = F(photo_imgs)
+        # F: photo->monet
         monet_gen_score = Dx(gen_monet)
         f_loss = mse_loss(monet_gen_score, ones)
 
+        # Cycle-consistency loss
+        # monet -> photo -> monet
+        monet_reconstructed = F(gen_photo)
+        cycle_fg = l1_loss(monet_real, monet_reconstructed)
+
+        # photo -> monet -> photo
+        photo_reconstructed = G(gen_monet)
+        cycle_gf = l1_loss(photo_real, photo_reconstructed)
+
+        cycle_loss = self.cycle_loss_lambda * (cycle_gf + cycle_fg)
+
         if train_stage == TrainStage.TRAIN:
+            g_optim.zero_grad()
             f_optim.zero_grad()
+
+            g_loss.backward()
             f_loss.backward()
+            cycle_loss.backward()
+
+            g_optim.step()
             f_optim.step()
 
-        ### Train Dy (photo discriminator) ###
-        gen_photos = G(monet_imgs)
-        photo_gen_score = Dy(gen_photos.detach())
-        photo_real_score = Dy(photo_imgs)
+        ### Train Discriminators
+        # Dy (photo discriminator)
+        photo_gen_score = Dy(gen_photo.detach())
+        photo_real_score = Dy(photo_real)
         d_y_loss_real = mse_loss(photo_real_score, ones)
         d_y_loss_fake = mse_loss(photo_gen_score, zeros)
         d_y_loss = d_y_loss_real + d_y_loss_fake
 
-        if train_stage == TrainStage.TRAIN:
-            d_y_optim.zero_grad()
-            d_y_loss.backward()
-            d_y_optim.step()
-
-        ### Train Dx (monet discriminator) ###
-        gen_monet = F(photo_imgs)
+        # Dx (monet discriminator) ###
         monet_gen_score = Dx(gen_monet.detach())
-        monet_real_score = Dx(monet_imgs)
+        monet_real_score = Dx(monet_real)
         d_x_loss_real = mse_loss(monet_real_score, ones)
         d_x_loss_fake = mse_loss(monet_gen_score, zeros)
         d_x_loss = d_x_loss_real + d_x_loss_fake
 
         if train_stage == TrainStage.TRAIN:
+            d_y_optim.zero_grad()
             d_x_optim.zero_grad()
+
+            d_y_loss.backward()
             d_x_loss.backward()
+
+            d_y_optim.step()
             d_x_optim.step()
-
-        ### Cycle-Consistency Loss
-        # monet -> photo -> monet
-        monet_reconstructed = F(G(monet_imgs))
-        # cycle consistency loss for F(G(x))
-        cycle_fg = l1_loss(monet_imgs, monet_reconstructed)
-
-        # photo -> monet -> photo
-        photo_reconstructed = G(F(photo_imgs))
-        cycle_gf = l1_loss(photo_imgs, photo_reconstructed)
-
-        cycle_loss = self.cycle_loss_lambda * (cycle_fg + cycle_gf)
-
-        if train_stage == TrainStage.TRAIN:
-            f_optim.zero_grad()
-            g_optim.zero_grad()
-            cycle_loss.backward()
-            f_optim.step()
-            g_optim.step()
 
         ### Identity Mapping Loss
         if self.use_id_loss:
-            gen_photo = G(monet_imgs)
-            id_loss_photo = l1_loss(gen_photo, photo_imgs)
+            gen_photo = G(monet_real)
+            id_loss_photo = l1_loss(gen_photo, photo_real)
 
-            gen_monet = F(photo_imgs)
-            id_loss_monet = l1_loss(gen_monet, monet_imgs)
+            gen_monet = F(photo_real)
+            id_loss_monet = l1_loss(gen_monet, monet_real)
 
             id_loss = self.id_loss_lambda * (id_loss_photo + id_loss_monet)
 
@@ -192,8 +190,8 @@ class CycleGANTrainer(NetworkTrainer):
                 g_optim.step()
                 f_optim.step()
 
-        outputs = (monet_imgs, photo_imgs, gen_monet, gen_photo)
-        losses = [g_loss, f_loss, d_x_loss, d_y_loss, cycle_loss]
+        outputs = (monet_real, photo_real, gen_monet, gen_photo)
+        losses = [g_loss, f_loss, d_x_loss, d_y_loss, cycle_loss, cycle_fg, cycle_gf]
         if self.use_id_loss:
             losses.append(id_loss)
 
@@ -207,9 +205,11 @@ class CycleGANTrainer(NetworkTrainer):
             'd_x_loss': loss[2].item(),
             'd_y_loss': loss[3].item(),
             'cycle_loss': loss[4].item(),
+            'cycle_fg': loss[5].item(),
+            'cycle_gf': loss[6].item(),
         }
-        if len(loss) == 6:
-            metrics['id_loss'] = loss[5].item()
+        if len(loss) == 8:
+            metrics['id_loss'] = loss[7].item()
         return metrics
 
     def pre_epoch_finish(self, input_, output, metric_manager, train_stage: TrainStage):
