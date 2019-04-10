@@ -19,7 +19,7 @@ class Monet2PhotoDataset(data.Dataset):
     and dataset dowload script: https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix/blob/master/datasets/download_cyclegan_dataset.sh
     for reference.
     """
-    def __init__(self, monet_path: str, photo_path: str, transform=None, shuffle=True, random_samp: int = 100000):
+    def __init__(self, monet_path: str, photo_path: str, transform=None, shuffle=True, random_samp: int=200000):
         """
         Args:
             monet_path(str): path to images of Monet paintings
@@ -69,7 +69,7 @@ class Monet2PhotoLoaderMaker(DataLoaderMaker):
     def __init__(self, batch_size: int, root_dir='./monet2photo',
                  train_monet_dir='trainA', train_photo_dir='trainB',
                  test_monet_dir='testA', test_photo_dir='testB',
-                 downsize_half=False, num_workers=8):
+                 random_samp=200000, downsize_half=False, num_workers=8):
         super().__init__()
         self.batch_size = batch_size
         self.root_dir = root_dir
@@ -111,11 +111,13 @@ class Monet2PhotoLoaderMaker(DataLoaderMaker):
         self.train_dataset = Monet2PhotoDataset(
             monet_path=self.train_monet_path,
             photo_path=self.train_photo_path,
-            transform=monet2photo_transform)
+            transform=monet2photo_transform,
+            random_samp=random_samp)
         self.test_dataset = Monet2PhotoDataset(
             monet_path=self.test_monet_path,
             photo_path=self.test_photo_path,
-            transform=monet2photo_transform)
+            transform=monet2photo_transform,
+            random_samp=random_samp)
 
         num_train_data = len(self.train_dataset)
         indices = list(range(num_train_data))
