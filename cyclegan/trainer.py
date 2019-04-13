@@ -140,6 +140,14 @@ class CycleGANTrainer(NetworkTrainer):
         # add all generator losses
         generator_loss = g_loss + f_loss + cycle_loss
 
+        ### Identity Mapping Loss
+        if self.use_id_loss:
+            id_loss_photo = l1_loss(gen_photo, photo_real)
+            id_loss_monet = l1_loss(gen_monet, monet_real)
+
+            id_loss = self.id_loss_lambda * (id_loss_photo + id_loss_monet)
+            generator_loss += id_loss
+
         if train_stage == TrainStage.TRAIN:
             g_optim.zero_grad()
             f_optim.zero_grad()
@@ -171,19 +179,6 @@ class CycleGANTrainer(NetworkTrainer):
             d_y_loss.backward()
             d_y_optim.step()
 
-        ### Identity Mapping Loss
-        if self.use_id_loss:
-            id_loss_photo = l1_loss(gen_photo, photo_real)
-            id_loss_monet = l1_loss(gen_monet, monet_real)
-
-            id_loss = self.id_loss_lambda * (id_loss_photo + id_loss_monet)
-
-            if train_stage == TrainStage.TRAIN:
-                g_optim.zero_grad()
-                f_optim.zero_grad()
-                id_loss.backward()
-                g_optim.step()
-                f_optim.step()
 
         outputs = (monet_real, photo_real, gen_monet, gen_photo)
         losses = [g_loss, f_loss, d_x_loss, d_y_loss, cycle_loss, cycle_fg, cycle_gf]
