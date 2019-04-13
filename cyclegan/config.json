@@ -3,8 +3,8 @@
   "data_root": "data_in/monet2photo/monet2photo",
   "epoch": 200,
   "lr": 0.0002,
-  "use_id_loss": false,
-  "cycle_loss_lambda": 10,
+  "use_id_loss": true,
   "id_loss_lambda": 5,
+  "cycle_loss_lambda": 10,
   "num_device": 4
 }

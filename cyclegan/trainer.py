@@ -23,8 +23,8 @@ class CycleGANTrainer(NetworkTrainer):
         self.data_root_dir = config['data_root']
         self.total_epoch = config['epoch']
         self.lr = config['lr']
-        self.use_id_loss = config['use_id_loss']
         self.cycle_loss_lambda = config['cycle_loss_lambda']  # typically 10
+        self.use_id_loss = config['use_id_loss']
         if self.use_id_loss:
             self.id_loss_lambda = config['id_loss_lambda']  # typically 5
         self.num_devices = config['num_device']
@@ -173,10 +173,7 @@ class CycleGANTrainer(NetworkTrainer):
 
         ### Identity Mapping Loss
         if self.use_id_loss:
-            gen_photo = G(monet_real)
             id_loss_photo = l1_loss(gen_photo, photo_real)
-
-            gen_monet = F(photo_real)
             id_loss_monet = l1_loss(gen_monet, monet_real)
 
             id_loss = self.id_loss_lambda * (id_loss_photo + id_loss_monet)
@@ -184,7 +181,7 @@ class CycleGANTrainer(NetworkTrainer):
             if train_stage == TrainStage.TRAIN:
                 g_optim.zero_grad()
                 f_optim.zero_grad()
-                cycle_loss.backward()
+                id_loss.backward()
                 g_optim.step()
                 f_optim.step()
 
