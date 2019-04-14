@@ -174,7 +174,7 @@ class CycleGANTrainer(NetworkTrainer):
             disc_loss.backward()
             disc_optim.step()
 
-        outputs = (monet_real, photo_real, gen_monet, gen_photo)
+        outputs = (monet_real, photo_real, gen_monet, gen_photo, monet_reconstructed, photo_reconstructed)
         losses = [g_loss, f_loss, d_x_loss, d_y_loss, cycle_loss, cycle_fg, cycle_gf]
         if self.use_id_loss:
             losses.append(id_loss)
@@ -203,11 +203,13 @@ class CycleGANTrainer(NetworkTrainer):
     def pre_epoch_finish(self, input_, output, metric_manager, train_stage: TrainStage):
         # save images at the end of validation step
         if train_stage == TrainStage.VALIDATE:
-            monet_imgs, photo_imgs, gen_monet, gen_photo = output
+            monet_imgs, photo_imgs, gen_monet, gen_photo, monet_reconst, photo_reconst = output
             self.log_images(monet_imgs, nrow=self.display_imgs, name='monet_real')
             self.log_images(photo_imgs, nrow=self.display_imgs, name='photo_real')
             self.log_images(gen_monet, nrow=self.display_imgs, name='monet_gen')
             self.log_images(gen_photo, nrow=self.display_imgs, name='photo_gen')
+            self.log_images(monet_reconst, nrow=self.display_imgs, name='monet_reconst')
+            self.log_images(photo_reconst, nrow=self.display_imgs, name='photo_reconst')
 
     def log_images(self, imgs, nrow: int, name: str):
         """
