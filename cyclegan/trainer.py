@@ -1,4 +1,5 @@
 import operator
+import itertools
 from typing import Dict
 import torch
 from torch import nn
@@ -72,10 +73,10 @@ class CycleGANTrainer(NetworkTrainer):
         }
 
         optimizers = {
-            'optimizer_g': optim.Adam(g.parameters(), self.lr, betas=(0.5, 0.999)),
-            'optimizer_f': optim.Adam(f.parameters(), self.lr, betas=(0.5, 0.999)),
-            'optimizer_d_x': optim.Adam(d_x.parameters(), self.lr, betas=(0.5, 0.999)),
-            'optimizer_d_y': optim.Adam(d_y.parameters(), self.lr, betas=(0.5, 0.999)),
+            'optimizer_generator': optim.Adam(
+                itertools.chain(g.parameters(), f.parameters()), self.lr, betas=(0.5, 0.999)),
+            'optimizer_discriminator': optim.Adam(
+                itertools.chain(d_y.parameters(), d_x.parameters()), self.lr, betas=(0.5, 0.999)),
         }
 
         super().__init__(
@@ -105,10 +106,8 @@ class CycleGANTrainer(NetworkTrainer):
         mse_loss = criteria['mse']
         l1_loss = criteria['l1']
 
-        g_optim = optimizer['optimizer_g']
-        f_optim = optimizer['optimizer_f']
-        d_x_optim = optimizer['optimizer_d_x']
-        d_y_optim = optimizer['optimizer_d_y']
+        gen_optim = optimizer['optimizer_generator']
+        disc_optim = optimizer['optimizer_discriminator']
 
         ### Generate images
         # monet -> photo
@@ -149,11 +148,9 @@ class CycleGANTrainer(NetworkTrainer):
             generator_loss += id_loss
 
         if train_stage == TrainStage.TRAIN:
-            g_optim.zero_grad()
-            f_optim.zero_grad()
+            gen_optim.zero_grad()
             generator_loss.backward()
-            g_optim.step()
-            f_optim.step()
+            gen_optim.step()
 
         ### Train Discriminators
         # Dy (photo discriminator)
@@ -163,27 +160,26 @@ class CycleGANTrainer(NetworkTrainer):
         d_y_loss_fake = mse_loss(photo_gen_score, zeros)
         d_y_loss = d_y_loss_real + d_y_loss_fake
 
-        # Dx (monet discriminator) ###
+        # Dx (monet discriminator)
         monet_gen_score = Dx(gen_monet.detach())
         monet_real_score = Dx(monet_real)
         d_x_loss_real = mse_loss(monet_real_score, ones)
         d_x_loss_fake = mse_loss(monet_gen_score, zeros)
         d_x_loss = d_x_loss_real + d_x_loss_fake
 
+        disc_loss = d_x_loss + d_y_loss
+
         if train_stage == TrainStage.TRAIN:
-            d_x_optim.zero_grad()
-            d_x_loss.backward()
-            d_x_optim.step()
-
-            d_y_optim.zero_grad()
-            d_y_loss.backward()
-            d_y_optim.step()
-
+            disc_optim.zero_grad()
+            disc_loss.backward()
+            disc_optim.step()
 
         outputs = (monet_real, photo_real, gen_monet, gen_photo)
         losses = [g_loss, f_loss, d_x_loss, d_y_loss, cycle_loss, cycle_fg, cycle_gf]
         if self.use_id_loss:
             losses.append(id_loss)
+            losses.append(id_loss_photo)
+            losses.append(id_loss_monet)
 
         return outputs, tuple(losses)
 
@@ -200,6 +196,8 @@ class CycleGANTrainer(NetworkTrainer):
         }
         if len(loss) == 8:
             metrics['id_loss'] = loss[7].item()
+            metrics['id_loss_photo'] = loss[8].item()
+            metrics['id_loss_monet'] = loss[9].item()
         return metrics
 
     def pre_epoch_finish(self, input_, output, metric_manager, train_stage: TrainStage):
