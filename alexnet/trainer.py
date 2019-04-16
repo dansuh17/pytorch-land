@@ -1,7 +1,7 @@
 import operator
 from typing import Dict
 import torch
-from torch import optim, nn
+from torch import optim, nn, autograd
 from torch.optim.optimizer import Optimizer
 from .alexnet import AlexNet
 from base_trainer import NetworkTrainer, ModelInfo, TrainStage
@@ -19,6 +19,7 @@ class AlexNetTrainer(NetworkTrainer):
         self.lr = config['lr']
         self.num_devices = config['num_devices']
         self.img_dim = 227
+        autograd.set_detect_anomaly(True)
 
         loadermaker = ImageNetLoaderMaker(self.data_root, self.batch_size, num_workers=4, img_dim=self.img_dim)
         self.input_size = (3, self.img_dim, self.img_dim)
@@ -56,9 +57,10 @@ class AlexNetTrainer(NetworkTrainer):
         loss = cross_entropy_loss(out_features, target_batch)
 
         if train_stage == TrainStage.TRAIN:
-            opt.zero_grad()
-            loss.backward()
-            opt.step()
+            with autograd.detect_anomaly():
+                opt.zero_grad()
+                loss.backward()
+                opt.step()
 
         outputs = (out_features, target_batch)
         losses = (loss, )
