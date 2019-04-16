@@ -17,7 +17,7 @@ class AlexNetTrainer(NetworkTrainer):
         self.total_epoch = config['epoch']
         self.data_root = config['data_root']
         self.lr = config['lr']
-        self.num_devices = ['num_devices']
+        self.num_devices = config['num_devices']
         self.img_dim = 227
 
         loadermaker = ImageNetLoaderMaker(self.data_root, self.batch_size, num_workers=4, img_dim=self.img_dim)

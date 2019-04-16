@@ -180,12 +180,12 @@ class ImageNetLoaderMaker(DataLoaderMaker):
         http://www.image-net.org/
         http://www.image-net.org/challenges/LSVRC/
     """
-    def __init__(self, root_dir: str, batch_size: int, num_workers: int,
+    def __init__(self, data_root: str, batch_size: int, num_workers: int,
                  img_dim=224, naive_normalization=False):
         super().__init__()
         self.num_classes = 1000
         self.img_dim = img_dim
-        self.root_dir = root_dir
+        self.data_root = data_root
         self.batch_size = batch_size
         self.num_workers = num_workers
 
@@ -211,9 +211,9 @@ class ImageNetLoaderMaker(DataLoaderMaker):
         ])
 
         # create datasets
-        self.train_dataset = datasets.ImageFolder(self.root_dir, self.train_transform)
-        self.validate_dataset = datasets.ImageFolder(self.root_dir, self.train_transform)
-        self.test_dataset = datasets.ImageFolder(self.root_dir, self.test_transform)
+        self.train_dataset = datasets.ImageFolder(self.data_root, self.train_transform)
+        self.validate_dataset = datasets.ImageFolder(self.data_root, self.train_transform)
+        self.test_dataset = datasets.ImageFolder(self.data_root, self.test_transform)
 
         # split the indices
         num_data = len(self.train_dataset)
