@@ -167,7 +167,7 @@ class CycleGANTrainer(NetworkTrainer):
         d_x_loss_fake = mse_loss(monet_gen_score, zeros)
         d_x_loss = d_x_loss_real + d_x_loss_fake
 
-        disc_loss = d_x_loss + d_y_loss
+        disc_loss = (d_x_loss + d_y_loss) * 0.5
 
         if train_stage == TrainStage.TRAIN:
             disc_optim.zero_grad()
@@ -194,7 +194,7 @@ class CycleGANTrainer(NetworkTrainer):
             'cycle_fg': loss[5].item(),
             'cycle_gf': loss[6].item(),
         }
-        if len(loss) == 8:
+        if len(loss) > 7:
             metrics['id_loss'] = loss[7].item()
             metrics['id_loss_photo'] = loss[8].item()
             metrics['id_loss_monet'] = loss[9].item()
