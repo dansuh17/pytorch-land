@@ -1,3 +1,6 @@
+"""
+Implementation of training of alexnet.
+"""
 import operator
 from typing import Dict
 import torch
@@ -9,6 +12,9 @@ from datasets.img_popular import ImageNetLoaderMaker
 
 
 class AlexNetTrainer(NetworkTrainer):
+    """
+    Trainer for AlexNet.
+    """
     def __init__(self, config: dict):
         print('Configuration')
         print(config)
@@ -47,15 +53,20 @@ class AlexNetTrainer(NetworkTrainer):
                  input_: torch.Tensor,
                  train_stage: TrainStage,
                  *args, **kwargs):
+        # parse inputs
         img_batch, target_batch = input_
 
         alexnet = model['alexnet'].model
         cross_entropy_loss = criteria['cross_entropy']
         opt = optimizer['optim']
 
+        # forward pass
         out_features = alexnet(img_batch)
+
+        # calculate loss
         loss = cross_entropy_loss(out_features, target_batch)
 
+        # update parameters
         if train_stage == TrainStage.TRAIN:
             with autograd.detect_anomaly():
                 opt.zero_grad()
@@ -73,16 +84,16 @@ class AlexNetTrainer(NetworkTrainer):
         accuracy = torch.sum(predictions == target_batch).float() / target_batch.size()[0]
 
         return {
-            'loss': loss.item(),
+            'loss': loss[0].item(),
             'accuracy': accuracy.item(),
         }
 
 
 if __name__ == '__main__':
-   import json
-   with open('alexnet/config.json', 'r') as configf:
-       config = json.loads(configf.read())
+    import json
+    with open('alexnet/config.json', 'r') as configf:
+        config = json.loads(configf.read())
 
-   trainer = AlexNetTrainer(config)
-   trainer.fit()
-   trainer.cleanup()
+    trainer = AlexNetTrainer(config)
+    trainer.fit()
+    trainer.cleanup()
