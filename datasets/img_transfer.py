@@ -93,19 +93,17 @@ class Monet2PhotoLoaderMaker(DataLoaderMaker):
                 raise FileNotFoundError(path)
 
         # downsize 256 x 256 image into half sized images
+        self.img_dim = 256
         if downsize_half:
-            monet2photo_transform = transforms.Compose([
-                transforms.Resize(size=(128, 128)),
-                transforms.ToTensor(),
-                transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)),
-            ])
-            self.img_size = (3, 128, 128)
-        else:
-            monet2photo_transform = transforms.Compose([
-                transforms.ToTensor(),
-                transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)),
-            ])
-            self.img_size = (3, 256, 256)
+            self.img_dim = 128
+        monet2photo_transform = transforms.Compose([
+            transforms.Resize(size=(int(self.img_dim * 1.2), int(self.img_dim * 1.2))),
+            transforms.RandomCrop(size=(self.img_dim, self.img_dim)),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)),
+        ])
+        self.img_size = (3, self.img_dim, self.img_dim)
 
         # create datasets that will be loaded to each dataloader instances
         self.train_dataset = Monet2PhotoDataset(

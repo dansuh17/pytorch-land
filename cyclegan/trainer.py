@@ -158,14 +158,14 @@ class CycleGANTrainer(NetworkTrainer):
         photo_real_score = Dy(photo_real)
         d_y_loss_real = mse_loss(photo_real_score, ones)
         d_y_loss_fake = mse_loss(photo_gen_score, zeros)
-        d_y_loss = d_y_loss_real + d_y_loss_fake
+        d_y_loss = (d_y_loss_real + d_y_loss_fake) * 0.5
 
         # Dx (monet discriminator)
         monet_gen_score = Dx(gen_monet.detach())
         monet_real_score = Dx(monet_real)
         d_x_loss_real = mse_loss(monet_real_score, ones)
         d_x_loss_fake = mse_loss(monet_gen_score, zeros)
-        d_x_loss = d_x_loss_real + d_x_loss_fake
+        d_x_loss = (d_x_loss_real + d_x_loss_fake) * 0.5
 
         disc_loss = (d_x_loss + d_y_loss) * 0.5
 
