@@ -29,7 +29,7 @@ class CycleGANTrainer(NetworkTrainer):
         if self.use_id_loss:
             self.id_loss_lambda = config['id_loss_lambda']  # typically 5
         self.num_devices = config['num_device']
-        self.display_imgs = 10  # display 10 sample images per epoch
+        self.display_imgs = 1  # display sample images per epoch
 
         loader_maker = Monet2PhotoLoaderMaker(
             self.batch_size, self.data_root_dir, downsize_half=True, num_workers=4)
