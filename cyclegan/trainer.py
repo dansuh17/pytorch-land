@@ -10,6 +10,7 @@ import torchvision
 from cyclegan.cyclegan import CycleGanDiscriminator, CycleGanGenerator
 from datasets.img_transfer import Monet2PhotoLoaderMaker
 from base_trainer import NetworkTrainer, ModelInfo, TrainStage
+from .img_history import ImgHistory
 
 
 class CycleGANTrainer(NetworkTrainer):
@@ -78,6 +79,9 @@ class CycleGANTrainer(NetworkTrainer):
             'optimizer_discriminator': optim.Adam(
                 itertools.chain(d_y.parameters(), d_x.parameters()), self.lr, betas=(0.5, 0.999)),
         }
+
+        self.fake_monet_history = ImgHistory()
+        self.fake_photo_history = ImgHistory()
 
         super().__init__(
             models, loader_maker, criteria, optimizers,
@@ -154,14 +158,14 @@ class CycleGANTrainer(NetworkTrainer):
 
         ### Train Discriminators
         # Dy (photo discriminator)
-        photo_gen_score = Dy(gen_photo.detach())
+        photo_gen_score = Dy(self.fake_photo_history.get(gen_photo.detach()))
         photo_real_score = Dy(photo_real)
         d_y_loss_real = mse_loss(photo_real_score, ones)
         d_y_loss_fake = mse_loss(photo_gen_score, zeros)
         d_y_loss = (d_y_loss_real + d_y_loss_fake) * 0.5
 
         # Dx (monet discriminator)
-        monet_gen_score = Dx(gen_monet.detach())
+        monet_gen_score = Dx(self.fake_monet_history.get(gen_monet.detach()))
         monet_real_score = Dx(monet_real)
         d_x_loss_real = mse_loss(monet_real_score, ones)
         d_x_loss_fake = mse_loss(monet_gen_score, zeros)
