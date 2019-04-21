@@ -42,9 +42,11 @@ class AlexNetTrainer(NetworkTrainer):
 
         optimizers = {'optim': optim.Adam(alexnet.parameters(), self.lr, betas=(0.5, 0.999))}
 
+        lr_scheduler = (optim.lr_scheduler.StepLR(optimizers['optim'], step_size=20, gamma=0.5), )
+
         super().__init__(
             models, loadermaker, criteria, optimizers,
-            epoch=self.total_epoch, num_devices=self.num_devices, lr_scheduler=None)
+            epoch=self.total_epoch, num_devices=self.num_devices, lr_scheduler=lr_scheduler)
 
     def run_step(self,
                  model: Dict[str, ModelInfo],
