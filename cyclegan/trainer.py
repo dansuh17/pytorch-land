@@ -34,7 +34,7 @@ class CycleGANTrainer(NetworkTrainer):
 
         loader_maker = Monet2PhotoLoaderMaker(
             self.batch_size, self.data_root_dir, downsize_half=True, num_workers=4)
-        img_size = loader_maker.img_size  # input size
+        self.img_size = loader_maker.img_size  # input size
 
         # create models
         g = CycleGanGenerator()  # monet -> photo generator
@@ -47,23 +47,23 @@ class CycleGANTrainer(NetworkTrainer):
         models = {
             'CycleGAN_G': ModelInfo(
                 model=g,
-                input_size=img_size,
+                input_size=self.img_size,
                 metric='loss_g',  # used for saving the 'best' model
                 comparison=operator.lt,
             ),
             'CycleGAN_F': ModelInfo(
                 model=f,
-                input_size=img_size,
+                input_size=self.img_size,
                 metric='loss_f',
             ),
             'CycleGAN_Dx': ModelInfo(
                 model=d_x,
-                input_size=img_size,
+                input_size=self.img_size,
                 metric='loss_d_x',
             ),
             'CycleGAN_Dy': ModelInfo(
                 model=d_y,
-                input_size=img_size,
+                input_size=self.img_size,
                 metric='loss_d_y',
             ),
         }
@@ -86,6 +86,9 @@ class CycleGANTrainer(NetworkTrainer):
         super().__init__(
             models, loader_maker, criteria, optimizers,
             epoch=self.total_epoch, num_devices=self.num_devices, lr_scheduler=None)
+
+    def sample_noise(self):
+        return (torch.randn(self.batch_size, *self.img_size) * 0.1).to(self.device)
 
     def run_step(self,
                  model: Dict[str, ModelInfo],
@@ -116,7 +119,6 @@ class CycleGANTrainer(NetworkTrainer):
         ### Generate images
         # monet -> photo
         gen_photo = G(monet_real)
-
         # photo -> monet
         gen_monet = F(photo_real)
 
@@ -131,11 +133,11 @@ class CycleGANTrainer(NetworkTrainer):
 
         # Cycle-consistency loss
         # monet -> photo -> monet
-        monet_reconstructed = F(gen_photo)
+        monet_reconstructed = F(gen_photo + self.sample_noise())
         cycle_fg = l1_loss(monet_real, monet_reconstructed)
 
         # photo -> monet -> photo
-        photo_reconstructed = G(gen_monet)
+        photo_reconstructed = G(gen_monet + self.sample_noise())
         cycle_gf = l1_loss(photo_real, photo_reconstructed)
 
         cycle_loss = self.cycle_loss_lambda * (cycle_gf + cycle_fg)
@@ -214,6 +216,7 @@ class CycleGANTrainer(NetworkTrainer):
             self.log_images(gen_photo, nrow=self.display_imgs, name='photo_gen')
             self.log_images(monet_reconst, nrow=self.display_imgs, name='monet_reconst')
             self.log_images(photo_reconst, nrow=self.display_imgs, name='photo_reconst')
+            self.log_images(gen_monet + self.sample_noise(), nrow=self.display_imgs, name='gen_monet_noise')
 
     def log_images(self, imgs, nrow: int, name: str):
         """
