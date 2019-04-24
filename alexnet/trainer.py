@@ -1,10 +1,13 @@
 """
-Implementation of training of alexnet.
+Implementation of training of AlexNet.
+
+See also: https://papers.nips.cc/paper/4824-imagenet-classification-with-deep-convolutional-neural-networks.pdf
 """
 import operator
 from typing import Dict
 import torch
 from torch import optim, nn
+from torch.nn.modules.loss import _Loss
 from torch.optim.optimizer import Optimizer
 from .alexnet import AlexNet
 from base_trainer import NetworkTrainer, ModelInfo, TrainStage
@@ -24,9 +27,10 @@ class AlexNetTrainer(NetworkTrainer):
         self.data_root = config['data_root']
         self.lr = config['lr']
         self.num_devices = config['num_devices']
-        self.img_dim = 227
+        self.img_dim = 227  # correct configuration to give values displayed in alexnet paper
 
-        loadermaker = ImageNetLoaderMaker(self.data_root, self.batch_size, num_workers=4, img_dim=self.img_dim)
+        loadermaker = ImageNetLoaderMaker(
+            self.data_root, self.batch_size, num_workers=4, img_dim=self.img_dim)
         self.input_size = (3, self.img_dim, self.img_dim)
 
         alexnet = AlexNet()
@@ -41,7 +45,7 @@ class AlexNetTrainer(NetworkTrainer):
 
         optimizers = {'optim': optim.Adam(alexnet.parameters(), self.lr, betas=(0.5, 0.999))}
 
-        lr_scheduler = (optim.lr_scheduler.StepLR(optimizers['optim'], step_size=20, gamma=0.5), )
+        lr_scheduler = {'steplr': optim.lr_scheduler.StepLR(optimizers['optim'], step_size=20, gamma=0.5)}
 
         super().__init__(
             models, loadermaker, criteria, optimizers,
@@ -49,7 +53,7 @@ class AlexNetTrainer(NetworkTrainer):
 
     def run_step(self,
                  model: Dict[str, ModelInfo],
-                 criteria: Dict[str, nn.modules.loss._Loss],
+                 criteria: Dict[str, _Loss],
                  optimizer: Dict[str, Optimizer],
                  input_: torch.Tensor,
                  train_stage: TrainStage,

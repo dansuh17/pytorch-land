@@ -9,6 +9,7 @@ from collections import defaultdict, namedtuple
 import torch
 import torch.nn as nn
 from torch.optim.optimizer import Optimizer
+from torch.optim.lr_scheduler import _LRScheduler
 from datasets.loader_maker import DataLoaderMaker
 from tensorboardX import SummaryWriter
 
@@ -92,7 +93,7 @@ class NetworkTrainer(ABC):
                  output_dir='data_out',
                  num_devices=1,
                  seed: int=None,
-                 lr_scheduler=None):
+                 lr_scheduler: Dict[str, _LRScheduler]=None):
         """
         Initialize the trainer.
 
@@ -105,7 +106,7 @@ class NetworkTrainer(ABC):
             output_dir (str): root output directory
             num_devices (int): number of GPU devices to split the batch
             seed (int): random seed to use
-            lr_scheduler: learning rate scheduler
+            lr_scheduler (None|Dict[str, _LRScheduler]): learning rate scheduler
         """
         # initial settings
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -142,10 +143,7 @@ class NetworkTrainer(ABC):
         self.total_epoch = epoch
         self.criterions = criterion
         self.optimizers = optimizer
-        if lr_scheduler is not None:
-            self.lr_schedulers = self._make_tuple(lr_scheduler)
-        else:
-            self.lr_schedulers = None
+        self.lr_schedulers = lr_scheduler
         self.writer = SummaryWriter(log_dir=self.log_dir)
 
         # initialize training process
@@ -168,25 +166,6 @@ class NetworkTrainer(ABC):
             model = model_info.model
             models[model_name] = model_info._replace(model=self._register_model(model))
         return models
-
-    @staticmethod
-    def _make_tuple(obj):
-        """
-        Make an object to tuple instance.
-        If the object is already a tuple, it returns itself.
-
-        Args:
-            obj: object instance to turn into tuple
-
-        Returns:
-            tuple object
-        """
-        if isinstance(obj, tuple):
-            return obj
-        if isinstance(obj, list):
-            return tuple(obj)  # make lists to tuple as well
-        else:
-            return (obj, )
 
     @staticmethod
     def _make_single_or_tuple(tuple_inst: tuple):
@@ -233,8 +212,8 @@ class NetworkTrainer(ABC):
 
     def _update_lr(self, val_metrics):
         if self.lr_schedulers is not None:
-            for idx, lrs in enumerate(self.lr_schedulers):
-                lrs.step(val_metrics.mean(self.standard_metric))
+            for lrs in self.lr_schedulers.values():
+                lrs.step()
 
     @abstractmethod
     def run_step(self,
