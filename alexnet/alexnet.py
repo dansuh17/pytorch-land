@@ -50,7 +50,10 @@ class AlexNet(nn.Module):
         for layer in self.net:
             if isinstance(layer, nn.Conv2d):
                 nn.init.normal_(layer.weight, mean=0, std=0.01)
-                nn.init.constant_(layer.bias, 0)
+                nn.init.constant_(layer.bias, 0.1)
+            elif isinstance(layer, nn.Linear):
+                nn.init.normal_(layer.weight, mean=0, std=0.005)
+                nn.init.constant_(layer.bias, 0.1)
 
         # original paper = 1 for Conv2d layers 2nd, 4th, and 5th conv layers
         nn.init.constant_(self.net[4].bias, 1)

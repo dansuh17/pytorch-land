@@ -198,7 +198,8 @@ class ImageNetLoaderMaker(DataLoaderMaker):
                 mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 
         self.train_transform = transforms.Compose([
-            transforms.RandomResizedCrop(self.img_dim),  # randomly resize the image
+            # randomly resize the image
+            transforms.RandomResizedCrop(self.img_dim, scale=(0.9, 1.0), ratio=(0.9, 1.1)),
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
             normalize,

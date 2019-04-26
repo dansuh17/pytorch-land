@@ -48,7 +48,7 @@ class AlexNetTrainer(NetworkTrainer):
 
         criteria = {'cross_entropy': nn.CrossEntropyLoss()}
 
-        adam = optim.Adam(alexnet.parameters(), self.lr, betas=(0.5, 0.999))
+        adam = optim.Adam(alexnet.parameters(), self.lr)
         optimizers = {'optim': adam}
 
         lr_scheduler = {'steplr': optim.lr_scheduler.StepLR(adam, step_size=20, gamma=0.5)}
