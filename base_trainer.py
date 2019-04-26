@@ -193,6 +193,8 @@ class NetworkTrainer(ABC):
         print(f'Using validation metric for best model : {use_val_metric}')
         best_metric = None
         for _ in range(self.epoch, self.total_epoch):
+            print(f'################# Starting epoch {self.epoch} ##################')
+
             train_metrics = self.train()
 
             # run upon validation set
@@ -216,13 +218,14 @@ class NetworkTrainer(ABC):
                 lrs.step()
 
     @abstractmethod
-    def run_step(self,
-                 model: Dict[str, ModelInfo],
-                 criteria: Dict[str, nn.modules.loss._Loss],
-                 optimizer: Dict[str, Optimizer],
-                 input_: torch.Tensor,
-                 train_stage: TrainStage,
-                 *args, **kwargs):
+    def run_step(
+            self,
+            model: Dict[str, ModelInfo],
+            criteria: Dict[str, nn.modules.loss._Loss],
+            optimizer: Dict[str, Optimizer],
+            input_: torch.Tensor,
+            train_stage: TrainStage,
+            *args, **kwargs):
         """
         Run a single step.
         It is given all required instances for training.
@@ -484,10 +487,12 @@ class NetworkTrainer(ABC):
             writer,
             optimizers: Dict[str, Optimizer],
             step: int):
-        for opt in optimizers.values():
+        for opt_name in optimizers:
+            opt = optimizers[opt_name]
             for idx, param_group in enumerate(opt.param_groups):
                 lr = param_group['lr']
-                writer.add_scalar('lr/{}'.format(idx), lr, step)
+                writer.add_scalar(f'lr/{opt_name}', lr, step)
+                print(f'Learning rate for optimizer {opt_name}: {lr}')
 
     def _save_module_summary_all(self, **kwargs):
         for model_name, model_info in self.models.items():
