@@ -14,6 +14,11 @@ from base_trainer import NetworkTrainer, ModelInfo, TrainStage
 from datasets.img_popular import ImageNetLoaderMaker
 
 
+# fix random seeds for experimenting
+torch.manual_seed(1004)
+torch.cuda.manual_seed_all(2019)
+
+
 class AlexNetTrainer(NetworkTrainer):
     """
     Trainer for AlexNet.
@@ -43,33 +48,35 @@ class AlexNetTrainer(NetworkTrainer):
 
         criteria = {'cross_entropy': nn.CrossEntropyLoss()}
 
-        optimizers = {'optim': optim.Adam(alexnet.parameters(), self.lr, betas=(0.5, 0.999))}
+        adam = optim.Adam(alexnet.parameters(), self.lr, betas=(0.5, 0.999))
+        optimizers = {'optim': adam}
 
-        lr_scheduler = {'steplr': optim.lr_scheduler.StepLR(optimizers['optim'], step_size=20, gamma=0.5)}
+        lr_scheduler = {'steplr': optim.lr_scheduler.StepLR(adam, step_size=20, gamma=0.5)}
 
         super().__init__(
             models, loadermaker, criteria, optimizers,
             epoch=self.total_epoch, num_devices=self.num_devices, lr_scheduler=lr_scheduler)
 
-    def run_step(self,
-                 model: Dict[str, ModelInfo],
-                 criteria: Dict[str, _Loss],
-                 optimizer: Dict[str, Optimizer],
-                 input_: torch.Tensor,
-                 train_stage: TrainStage,
-                 *args, **kwargs):
+    def run_step(
+            self,
+            model: Dict[str, ModelInfo],
+            criteria: Dict[str, _Loss],
+            optimizer: Dict[str, Optimizer],
+            input_: torch.Tensor,
+            train_stage: TrainStage,
+            *args, **kwargs):
         # parse inputs
-        img_batch, target_batch = input_
+        imgs, targets = input_
 
         alexnet = model['alexnet'].model
         cross_entropy_loss = criteria['cross_entropy']
         opt = optimizer['optim']
 
         # forward pass
-        out_features = alexnet(img_batch)
+        out_features = alexnet(imgs)
 
         # calculate loss
-        loss = cross_entropy_loss(out_features, target_batch)
+        loss = cross_entropy_loss(out_features, targets)
 
         # update parameters
         if train_stage == TrainStage.TRAIN:
@@ -77,7 +84,7 @@ class AlexNetTrainer(NetworkTrainer):
             loss.backward()
             opt.step()
 
-        outputs = (out_features, target_batch)
+        outputs = (out_features, targets)
         losses = (loss, )
         return outputs, losses
 
