@@ -35,7 +35,7 @@ class AlexNetTrainer(NetworkTrainer):
         self.img_dim = 227  # correct configuration to give values displayed in alexnet paper
 
         loadermaker = ImageNetLoaderMaker(
-            self.data_root, self.batch_size, num_workers=4, img_dim=self.img_dim)
+            self.data_root, self.batch_size, num_workers=8, img_dim=self.img_dim)
         self.input_size = (3, self.img_dim, self.img_dim)
 
         alexnet = AlexNet()
@@ -51,7 +51,7 @@ class AlexNetTrainer(NetworkTrainer):
         adam = optim.Adam(alexnet.parameters(), self.lr)
         optimizers = {'optim': adam}
 
-        lr_scheduler = {'steplr': optim.lr_scheduler.StepLR(adam, step_size=20, gamma=0.5)}
+        lr_scheduler = {'steplr': optim.lr_scheduler.StepLR(adam, step_size=20, gamma=0.2)}
 
         super().__init__(
             models, loadermaker, criteria, optimizers,

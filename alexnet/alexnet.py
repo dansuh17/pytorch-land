@@ -59,6 +59,7 @@ class AlexNet(nn.Module):
         nn.init.constant_(self.net[4].bias, 1)
         nn.init.constant_(self.net[10].bias, 1)
         nn.init.constant_(self.net[12].bias, 1)
+        print('weight initialized')
 
     def forward(self, x):
         """
@@ -73,3 +74,12 @@ class AlexNet(nn.Module):
         x = self.net(x)
         x = x.view(-1, 256 * 6 * 6)  # reduce the dimensions for linear layer input
         return self.classifier(x)
+
+
+if __name__ == '__main__':
+    import torch
+    alexnet = AlexNet()
+    input_ = torch.randn((10, 3, 227, 227))
+    output = alexnet(input_)
+    print(output.size())
+    print(output)
