@@ -48,10 +48,10 @@ class AlexNetTrainer(NetworkTrainer):
 
         criteria = {'cross_entropy': nn.CrossEntropyLoss()}
 
-        adam = optim.SGD(alexnet.parameters(), self.lr, momentum=0.9)
+        adam = optim.SGD(alexnet.parameters(), self.lr, momentum=0.9, weight_decay=0.0005)
         optimizers = {'optim': adam}
 
-        lr_scheduler = {'steplr': optim.lr_scheduler.StepLR(adam, step_size=20, gamma=0.2)}
+        lr_scheduler = {'steplr': optim.lr_scheduler.StepLR(adam, step_size=20, gamma=0.1)}
 
         super().__init__(
             models, loadermaker, criteria, optimizers,
@@ -74,11 +74,6 @@ class AlexNetTrainer(NetworkTrainer):
 
         # forward pass
         out_features = alexnet(imgs)
-        print('Outfeatures size: {}'.format(out_features.size()))
-        print(out_features)
-        print('Target size: {}'.format(targets))
-        print(targets)
-        print()
 
         # calculate loss
         loss = cross_entropy_loss(out_features, targets)
