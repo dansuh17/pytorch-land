@@ -15,8 +15,8 @@ from datasets.img_popular import ImageNetLoaderMaker
 
 
 # fix random seeds for experimenting
-torch.manual_seed(1004)
-torch.cuda.manual_seed_all(2019)
+# torch.manual_seed(1004)
+# torch.cuda.manual_seed_all(2019)
 
 
 class AlexNetTrainer(NetworkTrainer):
