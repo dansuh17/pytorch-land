@@ -93,7 +93,9 @@ class NetworkTrainer(ABC):
                  output_dir='data_out',
                  num_devices=1,
                  seed: int=None,
-                 lr_scheduler: Dict[str, _LRScheduler]=None):
+                 lr_scheduler: Dict[str, _LRScheduler]=None,
+                 log_every_local=50,
+                 save_module_every_local=500):
         """
         Initialize the trainer.
 
@@ -107,6 +109,8 @@ class NetworkTrainer(ABC):
             num_devices (int): number of GPU devices to split the batch
             seed (int): random seed to use
             lr_scheduler (None|Dict[str, _LRScheduler]): learning rate scheduler
+            log_every_local (int): log the progress every `log_every_local` steps
+            save_module_every_local (int): saves module information per this amount of steps
         """
         # initial settings
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -144,6 +148,8 @@ class NetworkTrainer(ABC):
         self.criterions = criterion
         self.optimizers = optimizer
         self.lr_schedulers = lr_scheduler
+        self.log_every_local = log_every_local
+        self.save_module_every_local = save_module_every_local
         self.writer = SummaryWriter(log_dir=self.log_dir)
 
         # initialize training process
@@ -322,12 +328,13 @@ class NetworkTrainer(ABC):
             self, input, output, metric: dict,
             dataset_size: int, train_stage: TrainStage):
         if train_stage == TrainStage.TRAIN:
-            if self.global_step % 20 == 0:
+            if self.local_step % self.log_every_local == 0:
                 self.log_metric(
                     self.writer, metric, self.epoch, self.global_step,
                     self.local_step, dataset_size, train_stage.value)
 
-            if self.global_step % 500 == 0:  # save models
+            # save model information
+            if self.local_step % self.save_module_every_local == 0:
                 self._save_module_summary_all()
 
     def pre_epoch_finish(

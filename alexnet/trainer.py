@@ -67,6 +67,9 @@ class AlexNetTrainer(NetworkTrainer):
             *args, **kwargs):
         # parse inputs
         imgs, targets = input_
+        # TODO: debug
+        print(imgs)
+        print(imgs.mean())
 
         alexnet = model['alexnet'].model
         cross_entropy_loss = criteria['cross_entropy']
