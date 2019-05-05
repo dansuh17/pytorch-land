@@ -90,9 +90,11 @@ class AlexNetTrainer(NetworkTrainer):
         return outputs, losses
 
     def pre_fit(self):
-        display_imgs = self.train_dataloader.dataset[:10]
-        grid = torchvision.utils.make_grid(display_imgs, nrow=10, normalize=True)
-        self.writer.add_image(f'example_imgs', grid, self.global_step)
+        # show example images before training
+        display_imgs, targets = self.train_dataloader.dataset[:20]
+        grid = torchvision.utils.make_grid(display_imgs, nrow=20, normalize=True)
+        self.writer.add_image('example_imgs', grid, self.global_step)
+        self.writer.add_text('labels', ', '.join([str(t) for t in targets]), self.global_step)
 
     @staticmethod
     def make_performance_metric(input_: torch.Tensor, output, loss) -> dict:

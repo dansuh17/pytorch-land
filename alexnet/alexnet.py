@@ -49,9 +49,11 @@ class AlexNet(nn.Module):
     def init_bias(self):
         for layer in self.net:
             if isinstance(layer, nn.Conv2d):
+                print('Conv initialized')  # TODO: debug
                 nn.init.normal_(layer.weight, mean=0, std=0.01)
                 nn.init.constant_(layer.bias, 0.1)
             elif isinstance(layer, nn.Linear):
+                print('Linear initialized')  # TODO: debug
                 nn.init.normal_(layer.weight, mean=0, std=0.005)
                 nn.init.constant_(layer.bias, 0.1)
 
