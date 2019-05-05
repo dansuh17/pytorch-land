@@ -267,7 +267,7 @@ class CIFAR10LoaderMaker(DataLoaderMaker):
 
     See Also: https://www.cs.toronto.edu/~kriz/cifar.html
     """
-    default_img_dim = 32
+    DEFAULT_IMG_DIM = 32
 
     def __init__(self, data_root: str, batch_size: int, num_workers=4,
                  img_dim=32, naive_normalization=False):
@@ -275,29 +275,29 @@ class CIFAR10LoaderMaker(DataLoaderMaker):
         self.num_workers = num_workers
         self.batch_size = batch_size
         self.num_classes = 10
-
-        # validate image size
-        if img_dim > self.default_img_dim:
-            raise ValueError(
-                'Image dimension cannot be larger than {}. Got : {}.'
-                .format(self.default_img_dim, img_dim))
         self.img_dim = img_dim
 
         # data normalizers
-        normalizer = transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]) \
-            if naive_normalization else \
-            transforms.Normalize(mean=[0.4914, 0.4822, 0.4465], std=[0.2023, 0.1994, 0.2010])
+        if naive_normalization:
+            normalizer = transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
+        else:
+            normalizer = transforms.Normalize(mean=[0.4914, 0.4822, 0.4465], std=[0.2023, 0.1994, 0.2010])
 
         train_img_dir = os.path.join(data_root, 'cifar10')
 
-        trainval_transform = transforms.Compose([
+        resizer = []
+        # resize the image if it does not match the original
+        if self.img_dim != self.DEFAULT_IMG_DIM:
+            resizer.append(transforms.Resize(self.img_dim))
+
+        trainval_transform = transforms.Compose(resizer + [
             transforms.RandomCrop(img_dim, padding=4),
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
             normalizer,
         ])
 
-        test_transform = transforms.Compose([
+        test_transform = transforms.Compose(resizer + [
             transforms.CenterCrop(size=img_dim),
             transforms.ToTensor(),
             normalizer,
@@ -352,68 +352,3 @@ class CIFAR10LoaderMaker(DataLoaderMaker):
             num_workers=self.num_workers,
             batch_size=self.batch_size,
         )
-
-
-def load_cifar100(data_root: str, batch_size: int, image_dim=32):
-    """Creates loaders of CIFAR100 dataset."""
-    normalize = transforms.Normalize(
-        mean=[0.4914, 0.4822, 0.4465], std=[0.2023, 0.1994, 0.2010])
-    train_img_dir = os.path.join(data_root, 'cifar100')
-    num_classes = 100
-    trainval_transform = transforms.Compose([
-        transforms.RandomCrop(image_dim, padding=4),
-        transforms.RandomHorizontalFlip(),
-        transforms.ToTensor(),
-        normalize,
-    ])
-    train_dataset = datasets.CIFAR100(
-        root=train_img_dir,
-        train=True, download=True,
-        transform=trainval_transform)
-    validate_dataset = datasets.CIFAR100(
-        root=train_img_dir,
-        train=True, download=True,
-        transform=trainval_transform)
-
-    # split indices btwn. train and validation sets
-    num_data = len(train_dataset)
-    indices = list(range(num_data))
-    random.shuffle(indices)
-    num_train = math.floor(num_data * 0.9)
-    train_idx, validate_idx = indices[:num_train], indices[num_train:]
-
-    # create data loaders out of datasets
-    train_dataloader = data.DataLoader(
-        train_dataset,
-        sampler=data.sampler.SubsetRandomSampler(train_idx),
-        pin_memory=True,
-        drop_last=True,
-        num_workers=4,
-        batch_size=batch_size,
-    )
-    validate_dataloader = data.DataLoader(
-        validate_dataset,
-        sampler=data.sampler.SubsetRandomSampler(validate_idx),
-        pin_memory=True,
-        drop_last=True,
-        num_workers=4,
-        batch_size=batch_size,
-    )
-
-    # create test dataset
-    test_dataset = datasets.CIFAR100(
-        root=train_img_dir,
-        train=False, download=True,
-        transform=transforms.Compose([
-            transforms.ToTensor(),
-            normalize,  # apply only normalization
-        ]))
-    test_dataloader = data.DataLoader(
-        test_dataset,
-        pin_memory=True,
-        drop_last=True,
-        num_workers=4,
-        shuffle=True,
-        batch_size=batch_size,
-    )
-    return train_dataloader, validate_dataloader, test_dataloader, {'num_classes': num_classes}

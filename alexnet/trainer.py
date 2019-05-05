@@ -12,7 +12,7 @@ from torch.optim.optimizer import Optimizer
 import torchvision
 from .alexnet import AlexNet
 from base_trainer import NetworkTrainer, ModelInfo, TrainStage
-from datasets.img_popular import ImageNetLoaderMaker
+from datasets.img_popular import ImageNetLoaderMaker, CIFAR10LoaderMaker
 
 
 # fix random seeds for experimenting
@@ -35,8 +35,9 @@ class AlexNetTrainer(NetworkTrainer):
         self.num_devices = config['num_devices']
         self.img_dim = 227  # correct configuration to give values displayed in alexnet paper
 
-        loadermaker = ImageNetLoaderMaker(
-            self.data_root, self.batch_size, num_workers=8, img_dim=self.img_dim)
+        # loadermaker = ImageNetLoaderMaker(
+        #     self.data_root, self.batch_size, num_workers=8, img_dim=self.img_dim)
+        loadermaker = CIFAR10LoaderMaker(self.data_root, self.batch_size, num_workers=4, img_dim=self.img_dim)  # TODO: debug
         self.input_size = (3, self.img_dim, self.img_dim)
 
         alexnet = AlexNet()
@@ -90,11 +91,17 @@ class AlexNetTrainer(NetworkTrainer):
         return outputs, losses
 
     def pre_fit(self):
-        # show example images before training
-        display_imgs, targets = self.train_dataloader.dataset[:20]
-        grid = torchvision.utils.make_grid(display_imgs, nrow=20, normalize=True)
+        # show an example image before training
+        labels = []
+        display_imgs = []
+        for i in range(20):
+            img, target = self.train_dataloader.dataset[i]
+            labels.append(str(target))
+            display_imgs.append(img)
+
+        grid = torchvision.utils.make_grid(torch.stack(display_imgs), nrow=20, normalize=True)
         self.writer.add_image('example_imgs', grid, self.global_step)
-        self.writer.add_text('labels', ', '.join([str(t) for t in targets]), self.global_step)
+        self.writer.add_text('labels', ', '.join(labels), self.global_step)
 
     @staticmethod
     def make_performance_metric(input_: torch.Tensor, output, loss) -> dict:

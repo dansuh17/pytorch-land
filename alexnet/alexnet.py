@@ -16,6 +16,7 @@ class AlexNet(nn.Module):
         # input size should be : (b x 3 x 227 x 227)
         # The image in the original paper states that width and height are 224 pixels, but
         # the dimensions after first convolution layer do not lead to 55 x 55.
+        # There is another option to provide padding of size 2 on 224 x 244.
         self.net = nn.Sequential(
             nn.Conv2d(in_channels=3, out_channels=96, kernel_size=11, stride=4),  # output: (b x 96 x 55 x 55)
             nn.ReLU(),
@@ -36,24 +37,24 @@ class AlexNet(nn.Module):
         # classifier is just a name for linear layers
         self.classifier = nn.Sequential(
             nn.Dropout(p=0.5),
-            nn.Linear(in_features=(256 * 6 * 6), out_features=4096),
+            nn.Linear(in_features=(256 * 6 * 6), out_features=4096),  # (b x (256 * 6 * 6) x 4096)
             nn.ReLU(),
             nn.Dropout(p=0.5),
-            nn.Linear(in_features=4096, out_features=4096),
+            nn.Linear(in_features=4096, out_features=4096),  # (b x 4096 x 4096)
             nn.ReLU(),
-            nn.Linear(in_features=4096, out_features=num_classes),
+            nn.Linear(in_features=4096, out_features=num_classes),  # (b x 4096 x num_classes)
         )
 
-        self.init_bias()  # initialize bias
+        self.weight_init()  # initialize weights
 
-    def init_bias(self):
+    def weight_init(self):
         for layer in self.net:
             if isinstance(layer, nn.Conv2d):
-                print('Conv initialized')  # TODO: debug
                 nn.init.normal_(layer.weight, mean=0, std=0.01)
                 nn.init.constant_(layer.bias, 0.1)
-            elif isinstance(layer, nn.Linear):
-                print('Linear initialized')  # TODO: debug
+
+        for layer in self.classifier:
+            if isinstance(layer, nn.Linear):
                 nn.init.normal_(layer.weight, mean=0, std=0.005)
                 nn.init.constant_(layer.bias, 0.1)
 
