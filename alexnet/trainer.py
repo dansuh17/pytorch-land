@@ -9,6 +9,7 @@ import torch
 from torch import optim, nn
 from torch.nn.modules.loss import _Loss
 from torch.optim.optimizer import Optimizer
+import torchvision
 from .alexnet import AlexNet
 from base_trainer import NetworkTrainer, ModelInfo, TrainStage
 from datasets.img_popular import ImageNetLoaderMaker
@@ -48,10 +49,10 @@ class AlexNetTrainer(NetworkTrainer):
 
         criteria = {'cross_entropy': nn.CrossEntropyLoss()}
 
-        adam = optim.SGD(alexnet.parameters(), self.lr, momentum=0.9, weight_decay=0.0005)
-        optimizers = {'optim': adam}
+        opt = optim.SGD(alexnet.parameters(), self.lr, momentum=0.9, weight_decay=0.0005)
+        optimizers = {'optim': opt}
 
-        lr_scheduler = {'steplr': optim.lr_scheduler.StepLR(adam, step_size=20, gamma=0.1)}
+        lr_scheduler = {'steplr': optim.lr_scheduler.StepLR(opt, step_size=20, gamma=0.1)}
 
         super().__init__(
             models, loadermaker, criteria, optimizers,
@@ -67,9 +68,6 @@ class AlexNetTrainer(NetworkTrainer):
             *args, **kwargs):
         # parse inputs
         imgs, targets = input_
-        # TODO: debug
-        print(imgs)
-        print(imgs.mean())
 
         alexnet = model['alexnet'].model
         cross_entropy_loss = criteria['cross_entropy']
@@ -90,6 +88,11 @@ class AlexNetTrainer(NetworkTrainer):
         outputs = (out_features, targets)
         losses = (loss, )
         return outputs, losses
+
+    def pre_fit(self):
+        display_imgs = self.train_dataloader.dataset[:10]
+        grid = torchvision.utils.make_grid(display_imgs, nrow=10, normalize=True)
+        self.writer.add_image(f'example_imgs', grid, self.global_step)
 
     @staticmethod
     def make_performance_metric(input_: torch.Tensor, output, loss) -> dict:

@@ -198,6 +198,8 @@ class NetworkTrainer(ABC):
         """Run the entire training process."""
         print(f'Using validation metric for best model : {use_val_metric}')
         best_metric = None
+        self.pre_fit()
+
         for _ in range(self.epoch, self.total_epoch):
             print(f'################# Starting epoch {self.epoch} ##################')
 
@@ -217,6 +219,12 @@ class NetworkTrainer(ABC):
         # run upon test set
         test_metrics = self.test()
         print('Training complete.')
+
+    def pre_fit(self):
+        """
+        Anything that could be run before the fitting starts.
+        """
+        pass
 
     def _update_lr(self, val_metrics):
         if self.lr_schedulers is not None:

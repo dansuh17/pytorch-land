@@ -230,7 +230,7 @@ class ImageNetLoaderMaker(DataLoaderMaker):
         self.validate_indices = valtest_indices[:num_validate]
         self.test_indices = valtest_indices[num_validate:]
 
-    def make_train_dataloader(self):
+    def make_train_dataloader(self) -> data.DataLoader:
         # create data loaders out of datasets
         return data.DataLoader(
             self.train_dataset,
@@ -241,7 +241,7 @@ class ImageNetLoaderMaker(DataLoaderMaker):
             batch_size=self.batch_size,
         )
 
-    def make_validate_dataloader(self):
+    def make_validate_dataloader(self) -> data.DataLoader:
         return data.DataLoader(
             self.validate_dataset,
             sampler=data.sampler.SubsetRandomSampler(self.validate_indices),
@@ -251,7 +251,7 @@ class ImageNetLoaderMaker(DataLoaderMaker):
             batch_size=self.batch_size,
         )
 
-    def make_test_dataloader(self):
+    def make_test_dataloader(self) -> data.DataLoader:
         return data.DataLoader(
             self.test_dataset,
             sampler=data.sampler.SubsetRandomSampler(self.test_indices),
