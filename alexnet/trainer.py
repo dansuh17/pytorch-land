@@ -12,7 +12,7 @@ from torch.optim.optimizer import Optimizer
 import torchvision
 from .alexnet import AlexNet
 from base_trainer import NetworkTrainer, ModelInfo, TrainStage
-from datasets.img_popular import ImageNetLoaderMaker, CIFAR10LoaderMaker
+from datasets.img_popular import ImageNetLoaderMaker
 
 
 # fix random seeds for experimenting
@@ -35,12 +35,15 @@ class AlexNetTrainer(NetworkTrainer):
         self.num_devices = config['num_devices']
         self.img_dim = 227  # correct configuration to give values displayed in alexnet paper
 
-        # loadermaker = ImageNetLoaderMaker(
-        #     self.data_root, self.batch_size, num_workers=8, img_dim=self.img_dim)
-        loadermaker = CIFAR10LoaderMaker(self.data_root, self.batch_size, num_workers=4, img_dim=self.img_dim)  # TODO: debug
+        loadermaker = ImageNetLoaderMaker(
+            self.data_root, self.batch_size, num_workers=8, img_dim=self.img_dim)
+        # DEBUG WITH CIFAR10
+        # loadermaker = CIFAR10LoaderMaker(
+        #     self.data_root, self.batch_size, num_workers=4, img_dim=self.img_dim)
         self.input_size = (3, self.img_dim, self.img_dim)
+        self.num_classes = loadermaker.num_classes
 
-        alexnet = AlexNet()
+        alexnet = AlexNet(self.num_classes)
         models = {
             'alexnet': ModelInfo(
                 model=alexnet, input_size=self.input_size, metric='loss', comparison=operator.lt),
