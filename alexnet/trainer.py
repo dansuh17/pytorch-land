@@ -10,9 +10,9 @@ from torch import optim, nn
 from torch.nn.modules.loss import _Loss
 from torch.optim.optimizer import Optimizer
 import torchvision
-from .alexnet import AlexNet
+from .alexnet import ModernizedAlexNet, AlexNet
 from base_trainer import NetworkTrainer, ModelInfo, TrainStage
-from datasets.img_popular import ImageNetLoaderMaker
+from datasets.img_popular import ImageNetLoaderMaker, CIFAR10LoaderMaker
 
 
 # fix random seeds for experimenting
@@ -36,14 +36,14 @@ class AlexNetTrainer(NetworkTrainer):
         self.img_dim = 227  # correct configuration to give values displayed in alexnet paper
 
         loadermaker = ImageNetLoaderMaker(
-            self.data_root, self.batch_size, num_workers=8, img_dim=self.img_dim)
+           self.data_root, self.batch_size, num_workers=8, img_dim=self.img_dim)
         # DEBUG WITH CIFAR10
         # loadermaker = CIFAR10LoaderMaker(
         #     self.data_root, self.batch_size, num_workers=4, img_dim=self.img_dim)
         self.input_size = (3, self.img_dim, self.img_dim)
         self.num_classes = loadermaker.num_classes
 
-        alexnet = AlexNet(self.num_classes)
+        alexnet = ModernizedAlexNet(self.num_classes)
         models = {
             'alexnet': ModelInfo(
                 model=alexnet, input_size=self.input_size, metric='loss', comparison=operator.lt),
@@ -53,7 +53,8 @@ class AlexNetTrainer(NetworkTrainer):
 
         criteria = {'cross_entropy': nn.CrossEntropyLoss()}
 
-        opt = optim.SGD(alexnet.parameters(), self.lr, momentum=0.9, weight_decay=0.0005)
+        # opt = optim.SGD(alexnet.parameters(), self.lr, momentum=0.9, weight_decay=0.0005)
+        opt = optim.Adam(alexnet.parameters(), self.lr)
         optimizers = {'optim': opt}
 
         lr_scheduler = {'steplr': optim.lr_scheduler.StepLR(opt, step_size=20, gamma=0.1)}
@@ -94,11 +95,13 @@ class AlexNetTrainer(NetworkTrainer):
         return outputs, losses
 
     def pre_fit(self):
-        # show an example image before training
+        # show example images before training
         labels = []
         display_imgs = []
+        dataset_size = len(self.train_dataloader.dataset)
+        step = dataset_size // 20
         for i in range(20):
-            img, target = self.train_dataloader.dataset[i]
+            img, target = self.train_dataloader.dataset[i * step]
             labels.append(str(target))
             display_imgs.append(img)
 
