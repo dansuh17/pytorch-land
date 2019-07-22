@@ -5,8 +5,9 @@ setup(
     version='0.1.0',
     description='pytorch-land for happy deep learning',
     long_description='',
-    author='deNsuh',
+    author='dansuh17',
     author_email='kaehops@gmail.com',
+    url='https://github.com/dansuh17/pytorch-land',
     license='MIT',
     packages=find_packages(),
 )
