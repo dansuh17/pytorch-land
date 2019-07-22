@@ -1,5 +1,4 @@
 ### general
-tags
 venv/
 test/
 data_in/
@@ -46,3 +45,8 @@ c3dl_*.json
 
 ### denoising autoencoders
 denoising_autoencoder/mnist/
+
+### ctags
+tags
+tags.lock
+tags.temp
