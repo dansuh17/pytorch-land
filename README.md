@@ -10,6 +10,14 @@ More flexible and intuitive than ignite, in my opinion :).
 
 More models to be added, and improvements on `NetworkTrainer` is under way.
 
+## Installation
+
+```bash
+pip3 install pytorch-land
+```
+
+See [pypi page](https://pypi.org/project/pytorch-land/) for package details.
+
 ## Implemented Models
 
 ### CNN architectures
@@ -40,7 +48,7 @@ file. The packages can be installed using the following command:
 pip3 install -r requirements.txt
 ```
 
-Notably, the codes are compatible with **pytorch 0.4**.
+Notably, the codes are compatible with **pytorch 0.4** - working on with **pytorch 1.1** compatibility.
 
 ## NetworkTrainer
 
