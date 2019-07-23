@@ -2,7 +2,7 @@ import os
 import sys
 import operator
 from abc import ABC, abstractmethod
-from typing import Dict
+from typing import Dict, Any
 import math
 from enum import Enum, unique
 from collections import defaultdict, namedtuple
@@ -10,7 +10,7 @@ import torch
 import torch.nn as nn
 from torch.optim.optimizer import Optimizer
 from torch.optim.lr_scheduler import _LRScheduler
-from datasets.loader_maker import DataLoaderMaker
+from torchland.datasets.loader_maker import DataLoaderMaker
 from tensorboardX import SummaryWriter
 
 
@@ -76,6 +76,26 @@ class MetricManager:
         self.metric_avgs[key] = val
 
 
+class AttributeHolder:
+    def __init__(self):
+        self.num_attrs = 0
+
+    def add(self, name: str, attr: Any):
+        setattr(self, name, attr)
+        self.num_attrs += 1
+
+    def empty(self):
+        return self.num_attrs == 0
+
+    def __len__(self):
+        return self.num_attrs
+
+    def __iter__(self):
+        return iter(vars(self))
+
+    def __getitem__(self, item):
+        return getattr(self, item)
+
 class NetworkTrainer(ABC):
     """
     Generalized Neural Network trainer that make it easy to customize for different
@@ -85,10 +105,6 @@ class NetworkTrainer(ABC):
     """
 
     def __init__(self,
-                 models: Dict[str, ModelInfo],
-                 dataloader_maker: DataLoaderMaker,
-                 criterion: Dict[str, nn.modules.loss._Loss],
-                 optimizer: Dict[str, Optimizer],
                  epoch: int,
                  output_dir='data_out',
                  num_devices=1,
@@ -125,11 +141,17 @@ class NetworkTrainer(ABC):
 
         # training devices to use
         self.device_ids = list(range(num_devices))
-
         self.trainer_name = self.__class__.__name__
 
         # prepare model(s) for training
-        self.models: Dict[str, ModelInfo] = self._validate_model_dict(models)
+        self.models = AttributeHolder()
+        self.criteria = AttributeHolder()
+        self.optimizers = AttributeHolder()
+
+        # dataloaders
+        self.train_dataloader = None
+        self.val_dataloader = None
+        self.test_dataloader = None
 
         # setup and create output directories
         self.output_dir = output_dir
@@ -138,15 +160,8 @@ class NetworkTrainer(ABC):
         self.onnx_dir = self._create_output_dir('onnx')
         self.checkpoint_dir = self._create_output_dir('checkpoints')
 
-        # create dataloaders
-        self.train_dataloader = dataloader_maker.make_train_dataloader()
-        self.val_dataloader = dataloader_maker.make_validate_dataloader()
-        self.test_dataloader = dataloader_maker.make_test_dataloader()
-
         # save any other states or variables to maintain
         self.total_epoch = epoch
-        self.criterions = criterion
-        self.optimizers = optimizer
         self.lr_schedulers = lr_scheduler
         self.log_every_local = log_every_local
         self.save_module_every_local = save_module_every_local
@@ -156,6 +171,25 @@ class NetworkTrainer(ABC):
         self.epoch = 0
         self.global_step = 0  # total steps run
         self.local_step = 0  # local step within a single epoch
+
+    def add_model(self, name: str, model, input_size, metric: str):
+        self.models.add(
+            name,
+            ModelInfo(model=model, input_size=input_size, metric=metric))
+
+    def add_optimizer(self, name: str, optimizer: Optimizer):
+        self.optimizers.add(name, optimizer)
+
+    def add_criterion(self, name: str, criteria):
+        self.criteria.add(name, criteria)
+
+    def set_dataloader_builder(self, dataloader_builder):
+        if dataloader_builder is None:
+            raise ValueError('dataloader builder should not be None')
+
+        self.train_dataloader = dataloader_builder.make_train_dataloader()
+        self.val_dataloader = dataloader_builder.make_validate_dataloader()
+        self.test_dataloader = dataloader_builder.make_test_dataloader()
 
     def _validate_model_dict(self, models: Dict[str, ModelInfo]):
         if not isinstance(models, dict):
@@ -167,6 +201,7 @@ class NetworkTrainer(ABC):
             if not isinstance(model_info, ModelInfo):
                 raise ValueError(
                     'Model info must have type : ' + ModelInfo.__class__.__name__)
+
         for model_name in models:
             model_info = models[model_name]
             model = model_info.model
@@ -280,7 +315,7 @@ class NetworkTrainer(ABC):
             # the parameters passed should have equal form as passed into the constructor
             output, loss = self.run_step(
                 self.models,
-                self.criterions,
+                self.criteria,
                 self.optimizers,
                 input_,
                 train_stage)

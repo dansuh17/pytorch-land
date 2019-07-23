@@ -27,7 +27,7 @@ import librosa
 import numpy as np
 from torch.utils.data import Dataset, DataLoader, sampler
 from tqdm import tqdm
-from utils.spectrogram import split_spectrogram, normalize_db_spectrogram
+from torchland.utils.spectrogram import split_spectrogram, normalize_db_spectrogram
 from .loader_maker import DataLoaderMaker
 
 

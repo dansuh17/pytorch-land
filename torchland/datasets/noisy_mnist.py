@@ -8,7 +8,7 @@ import numpy as np
 from PIL import Image
 from torch.utils.data import Dataset, DataLoader, sampler
 import torchvision.transforms as transforms
-from utils.noise import zero_mask_noise
+from torchland.utils.noise import zero_mask_noise
 
 
 TRAIN_IMG_URL = 'http://yann.lecun.com/exdb/mnist/train-images-idx3-ubyte.gz'
