@@ -3,6 +3,7 @@ venv/
 test/
 data_in/
 data_out/
+runs/
 
 ### OSX
 ._*
