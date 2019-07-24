@@ -13,10 +13,10 @@ import random
 from torch.utils import data
 import torchvision.datasets as datasets
 import torchvision.transforms as transforms
-from .loader_maker import DataLoaderMaker
+from .loader_maker import DataLoaderBuilder
 
 
-class MNISTLoaderMaker(DataLoaderMaker):
+class MNISTLoaderBuilder(DataLoaderBuilder):
     """Data loader maker for MNIST dataset."""
     def __init__(self, data_root: str, batch_size: int, num_workers=4, naive_normalization=False):
         super().__init__()
@@ -96,7 +96,7 @@ class MNISTLoaderMaker(DataLoaderMaker):
         return test_dataloader
 
 
-class LSUNLoaderMaker(DataLoaderMaker):
+class LSUNLoaderBuilder(DataLoaderBuilder):
     """DataLoader maker for LSUN (Large-scale scene understanding) dataset."""
     def __init__(self, data_root: str, batch_size: int, num_workers=4):
         super().__init__()
@@ -168,7 +168,7 @@ class LSUNLoaderMaker(DataLoaderMaker):
         )
 
 
-class ImageNetLoaderMaker(DataLoaderMaker):
+class ImageNetLoaderBuilder(DataLoaderBuilder):
     """
     Create a DataLoader maker for ImageNet dataset.
     This dataset is commonly used for ILSVRC (Imagenet Large Scale Visual Recognition Challenge) competition,
@@ -262,7 +262,7 @@ class ImageNetLoaderMaker(DataLoaderMaker):
         )
 
 
-class CIFAR10LoaderMaker(DataLoaderMaker):
+class CIFAR10LoaderBuilder(DataLoaderBuilder):
     """DataLoader maker for CIFAR-10 dataset.
 
     See Also: https://www.cs.toronto.edu/~kriz/cifar.html

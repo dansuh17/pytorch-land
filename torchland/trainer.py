@@ -11,11 +11,8 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 from torch.optim.optimizer import Optimizer
 from torch.optim.lr_scheduler import _LRScheduler
-from torchland.datasets.loader_maker import DataLoaderMaker
-from tensorboardX import SummaryWriter
-
-
-T = TypeVar('T')
+from torchland.datasets.loader_maker import DataLoaderBuilder
+from torch.utils.tensorboard import SummaryWriter
 
 
 """Tuple storing model information."""
@@ -80,6 +77,9 @@ class MetricManager:
         self.metric_avgs[key] = val
 
 
+T = TypeVar('T')
+
+
 class AttributeHolder(Generic[T], Iterable):
     def __init__(self):
         self.num_attrs = 0
@@ -131,6 +131,8 @@ class NetworkTrainer(ABC):
         """
         # initial settings
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        # training devices to use
+        self.device_ids = list(range(num_devices))
 
         # set seed
         if seed is None:
@@ -140,8 +142,6 @@ class NetworkTrainer(ABC):
             torch.manual_seed(seed)
         print(f'Using random seed : {self.seed}')
 
-        # training devices to use
-        self.device_ids = list(range(num_devices))
         self.trainer_name = self.__class__.__name__
 
         # prepare model(s) for training
@@ -173,7 +173,7 @@ class NetworkTrainer(ABC):
         self.global_step = 0  # total steps run
         self.local_step = 0  # local step within a single epoch
 
-    def add_model(self, name: str, model, input_size, metric: str):
+    def add_model(self, name: str, model: nn.Module, input_size: Tuple[int, ...], metric: str):
         self.models.add(
             name,
             ModelInfo(
@@ -187,40 +187,13 @@ class NetworkTrainer(ABC):
     def add_criterion(self, name: str, criteria: nn.Module):
         self.criteria.add(name, criteria)
 
-    def set_dataloader_builder(self, dataloader_builder: DataLoaderMaker):
+    def set_dataloader_builder(self, dataloader_builder: DataLoaderBuilder):
         if dataloader_builder is None:
             raise ValueError('dataloader builder should not be None')
 
         self.train_dataloader = dataloader_builder.make_train_dataloader()
         self.val_dataloader = dataloader_builder.make_validate_dataloader()
         self.test_dataloader = dataloader_builder.make_test_dataloader()
-
-    def _validate_model_dict(self, models: Dict[str, ModelInfo]):
-        if not isinstance(models, dict):
-            raise ValueError(
-                'models should be an instance of dict, '
-                'while provided : {}'.format(type(models)))
-        for model_name in models:
-            model_info = models[model_name]
-            if not isinstance(model_info, ModelInfo):
-                raise ValueError(
-                    'Model info must have type : ' + ModelInfo.__class__.__name__)
-
-        for model_name in models:
-            model_info = models[model_name]
-            model = model_info.model
-            models[model_name] = model_info._replace(model=self._register_model(model))
-        return models
-
-    @staticmethod
-    def _make_single_or_tuple(tuple_inst: tuple):
-        if not isinstance(tuple_inst, tuple):
-            raise ValueError("Input tuple_inst should be an instance of tuple!")
-
-        if len(tuple_inst) > 1:
-            return tuple_inst
-        else:
-            return tuple_inst[0]
 
     @property
     def standard_metric(self):
@@ -467,7 +440,7 @@ class NetworkTrainer(ABC):
         """
         return data
 
-    def _save_best_model(self, models: Dict[str, ModelInfo], prev_best_metric, curr_metric):
+    def _save_best_model(self, models: AttributeHolder[ModelInfo], prev_best_metric, curr_metric):
         if prev_best_metric is None:
             return curr_metric
 
@@ -493,7 +466,8 @@ class NetworkTrainer(ABC):
         return best_metric
 
     def _save_all_modules(self):
-        for model_info in self.models.values():
+        for model_name in self.models:
+            model_info = self.models[model_name]
             self._save_module(
                 model_info.model.module, model_info.input_size)
 

@@ -9,7 +9,7 @@ import torch
 from torch.utils import data
 from torchvision.datasets import folder
 import torchvision.transforms as transforms
-from .loader_maker import DataLoaderMaker
+from .loader_maker import DataLoaderBuilder
 
 
 class Monet2PhotoDataset(data.Dataset):
@@ -62,7 +62,7 @@ class Monet2PhotoDataset(data.Dataset):
         return len(self.datapairs)
 
 
-class Monet2PhotoLoaderMaker(DataLoaderMaker):
+class Monet2PhotoLoaderBuilder(DataLoaderBuilder):
     """
     DataLoader maker for Monet-to-Photo dataset, renown for being used by CycleGAN.
     """
@@ -162,7 +162,7 @@ if __name__ == '__main__':
         photo_path='./cyclegan/datasets/monet2photo/trainB',
         transform=transform)
 
-    monet2photo_loadermaker = Monet2PhotoLoaderMaker(
+    monet2photo_loadermaker = Monet2PhotoLoaderBuilder(
         batch_size=10, root_dir='./cyclegan/datasets/monet2photo/', downsize_half=True)
     train_dataloader = monet2photo_loadermaker.make_train_dataloader()
 

@@ -28,7 +28,7 @@ import numpy as np
 from torch.utils.data import Dataset, DataLoader, sampler
 from tqdm import tqdm
 from torchland.utils.spectrogram import split_spectrogram, normalize_db_spectrogram
-from .loader_maker import DataLoaderMaker
+from .loader_maker import DataLoaderBuilder
 
 
 N_MELS = 40  # number of mel filters
@@ -45,7 +45,7 @@ CLEAN_TRAINSET_DIR = 'clean_trainset'
 NOISY_TRAINSET_DIR = 'noisy_trainset'
 
 
-class VCTKLoaderMaker(DataLoaderMaker):
+class VCTKLoaderBuilder(DataLoaderBuilder):
     """Class that helps creating DataLoader instances for VCTK dataset."""
     def __init__(self, data_path: str, batch_size: int, num_workers=8,
                  use_channel=False, use_db_spec=False):

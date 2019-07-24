@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from torch.utils.data import DataLoader
 
 
-class DataLoaderMaker(ABC):
+class DataLoaderBuilder(ABC):
     def __init__(self):
         pass
 

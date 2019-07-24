@@ -2,10 +2,10 @@ import math
 import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader
-from .loader_maker import DataLoaderMaker
+from .loader_maker import DataLoaderBuilder
 
 
-class MixtureOfGaussiansLoaderMaker(DataLoaderMaker):
+class MixtureOfGaussiansLoaderBuilder(DataLoaderBuilder):
     """DataLoader maker for mixture of Gaussians dataset."""
     def __init__(self, total_size: int, batch_size: int, num_workers=4):
         super().__init__()
