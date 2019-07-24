@@ -2,16 +2,20 @@ import os
 import sys
 import operator
 from abc import ABC, abstractmethod
-from typing import Dict, Any
+from typing import Dict, Any, TypeVar, Generic, Iterable, Union, Tuple
 import math
 from enum import Enum, unique
 from collections import defaultdict, namedtuple
 import torch
 import torch.nn as nn
+from torch.utils.data import DataLoader
 from torch.optim.optimizer import Optimizer
 from torch.optim.lr_scheduler import _LRScheduler
 from torchland.datasets.loader_maker import DataLoaderMaker
 from tensorboardX import SummaryWriter
+
+
+T = TypeVar('T')
 
 
 """Tuple storing model information."""
@@ -76,7 +80,7 @@ class MetricManager:
         self.metric_avgs[key] = val
 
 
-class AttributeHolder:
+class AttributeHolder(Generic[T], Iterable):
     def __init__(self):
         self.num_attrs = 0
 
@@ -91,10 +95,11 @@ class AttributeHolder:
         return self.num_attrs
 
     def __iter__(self):
-        return iter(vars(self))
+        return iter(filter(lambda s: s != 'num_attrs', vars(self)))
 
     def __getitem__(self, item):
         return getattr(self, item)
+
 
 class NetworkTrainer(ABC):
     """
@@ -116,10 +121,6 @@ class NetworkTrainer(ABC):
         Initialize the trainer.
 
         Args:
-            models (Dict[str, ModelInfo]): network model(s)
-            dataloader_maker (DataLoaderMaker): instance creating dataloaders
-            criterion: training criterion (a.k.a. loss function)
-            optimizer (Dict[str, Optimizer]): gradient descent optimizer
             epoch (int): total epochs to train (the end epoch)
             output_dir (str): root output directory
             num_devices (int): number of GPU devices to split the batch
@@ -144,11 +145,11 @@ class NetworkTrainer(ABC):
         self.trainer_name = self.__class__.__name__
 
         # prepare model(s) for training
-        self.models = AttributeHolder()
-        self.criteria = AttributeHolder()
-        self.optimizers = AttributeHolder()
+        self.models: AttributeHolder[ModelInfo] = AttributeHolder()
+        self.criteria: AttributeHolder[nn.Module] = AttributeHolder()
+        self.optimizers: AttributeHolder[Optimizer] = AttributeHolder()
 
-        # dataloaders
+        # dataloaders - should be set using set_dataloader_builder() after __init__()
         self.train_dataloader = None
         self.val_dataloader = None
         self.test_dataloader = None
@@ -175,15 +176,18 @@ class NetworkTrainer(ABC):
     def add_model(self, name: str, model, input_size, metric: str):
         self.models.add(
             name,
-            ModelInfo(model=model, input_size=input_size, metric=metric))
+            ModelInfo(
+                model=self._register_model(model),
+                input_size=input_size,
+                metric=metric))
 
     def add_optimizer(self, name: str, optimizer: Optimizer):
         self.optimizers.add(name, optimizer)
 
-    def add_criterion(self, name: str, criteria):
+    def add_criterion(self, name: str, criteria: nn.Module):
         self.criteria.add(name, criteria)
 
-    def set_dataloader_builder(self, dataloader_builder):
+    def set_dataloader_builder(self, dataloader_builder: DataLoaderMaker):
         if dataloader_builder is None:
             raise ValueError('dataloader builder should not be None')
 
@@ -269,10 +273,10 @@ class NetworkTrainer(ABC):
     @abstractmethod
     def run_step(
             self,
-            model: Dict[str, ModelInfo],
-            criteria: Dict[str, nn.modules.loss._Loss],
-            optimizer: Dict[str, Optimizer],
-            input_: torch.Tensor,
+            models: AttributeHolder[ModelInfo],
+            criteria: AttributeHolder[nn.Module],
+            optimizers: AttributeHolder[Optimizer],
+            input_: Union[torch.Tensor, Tuple[torch.Tensor]],
             train_stage: TrainStage,
             *args, **kwargs):
         """
@@ -280,10 +284,10 @@ class NetworkTrainer(ABC):
         It is given all required instances for training.
 
         Args:
-            model (Dict[str, ModelInfo]): models to train
-            criteria: model criteria functions
-            optimizer (Dict[str, Optimizer]): model optimizers
-            input_ (torch.Tensor | tuple[torch.Tensor]): inputs to models
+            models (AttributeHolder[ModelInfo]): models to train
+            criteria (AttributeHolder[nn.Module]): model criteria functions
+            optimizers (AttributeHolder[Optimizer]): model optimizers
+            input_ (Union[torch.Tensor, Tuple[torch.Tensor]]): inputs to models
             train_stage (TrainStage): enum indicating which stage of training it is going through
 
         Returns:
@@ -291,12 +295,12 @@ class NetworkTrainer(ABC):
         """
         raise NotImplementedError
 
-    def _run_epoch(self, dataloader, train_stage: TrainStage):
+    def _run_epoch(self, dataloader: DataLoader, train_stage: TrainStage):
         """
         Runs an epoch for a dataset.
 
         Args:
-            dataloader (torch.utils.data.DataLoader): data loader to use in this epoch
+            dataloader (DataLoader): data loader to use in this epoch
             train_stage (TrainStage): enum indicating which training step this epoch is running
 
         Returns:
@@ -534,9 +538,7 @@ class NetworkTrainer(ABC):
 
     @staticmethod
     def save_learning_rate(
-            writer,
-            optimizers: Dict[str, Optimizer],
-            step: int):
+            writer, optimizers, step: int):
         for opt_name in optimizers:
             opt = optimizers[opt_name]
             for idx, param_group in enumerate(opt.param_groups):
@@ -545,7 +547,8 @@ class NetworkTrainer(ABC):
                 print(f'Learning rate for optimizer {opt_name}: {lr}')
 
     def _save_module_summary_all(self, **kwargs):
-        for model_name, model_info in self.models.items():
+        for model_name in self.models:
+            model_info = self.models[model_name]
             self._save_module_summary(
                 self.writer, model_name, model_info.model.module, self.global_step, **kwargs)
 
