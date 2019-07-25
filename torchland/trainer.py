@@ -445,12 +445,8 @@ class NetworkTrainer(ABC):
             return curr_metric
 
         best_metric = prev_best_metric
-        for model_info in models.values():
-            model = model_info.model
-            compare_metric = model_info.metric
-            comparison = model_info.comparison
-            input_size = model_info.input_size
-
+        for model_name in models:
+            model, input_size, compare_metric, comparison = models[model_name]
             # compare the standard metric, and if the standard performance metric
             # is better, then save the best model
             if comparison(
@@ -459,6 +455,8 @@ class NetworkTrainer(ABC):
                 # onnx model saving may fail due to unsupported operators, etc.
                 try:
                     self._save_module(model.module, input_size, save_onnx=True, prefix='best_')
+                except ImportError as onnx_err:
+                    print(f'Failed to import package onnx: {onnx_err}')
                 except RuntimeError as onnx_err:
                     print(f'Saving onnx model failed : {onnx_err}')
                 self._save_module(model.module, input_size, prefix='best')

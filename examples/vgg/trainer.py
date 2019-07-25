@@ -7,7 +7,6 @@ from .model import SimpleModel
 
 
 class VGGTrainer(NetworkTrainer):
-
     def __init__(self, config: dict):
         super().__init__(epoch=100)
         self.lr_init = 3e-4
