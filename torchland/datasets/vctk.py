@@ -28,7 +28,7 @@ import numpy as np
 from torch.utils.data import Dataset, DataLoader, sampler
 from tqdm import tqdm
 from torchland.utils.spectrogram import split_spectrogram, normalize_db_spectrogram
-from .loader_maker import DataLoaderBuilder
+from .loader_builder import DataLoaderBuilder
 
 
 N_MELS = 40  # number of mel filters

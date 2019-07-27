@@ -9,7 +9,7 @@ import torch
 from torch.utils import data
 from torchvision.datasets import folder
 import torchvision.transforms as transforms
-from .loader_maker import DataLoaderBuilder
+from .loader_builder import DataLoaderBuilder
 
 
 class Monet2PhotoDataset(data.Dataset):

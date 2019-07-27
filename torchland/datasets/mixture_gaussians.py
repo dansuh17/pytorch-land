@@ -2,7 +2,7 @@ import math
 import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader
-from .loader_maker import DataLoaderBuilder
+from .loader_builder import DataLoaderBuilder
 
 
 class MixtureOfGaussiansLoaderBuilder(DataLoaderBuilder):

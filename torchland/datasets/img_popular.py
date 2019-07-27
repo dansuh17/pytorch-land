@@ -13,7 +13,7 @@ import random
 from torch.utils import data
 import torchvision.datasets as datasets
 import torchvision.transforms as transforms
-from .loader_maker import DataLoaderBuilder
+from .loader_builder import DataLoaderBuilder
 
 
 class MNISTLoaderBuilder(DataLoaderBuilder):

@@ -1,3 +1,4 @@
+import datetime
 import os
 import sys
 import operator
@@ -11,7 +12,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 from torch.optim.optimizer import Optimizer
 from torch.optim.lr_scheduler import _LRScheduler
-from torchland.datasets.loader_maker import DataLoaderBuilder
+from torchland.datasets.loader_builder import DataLoaderBuilder
 from torch.utils.tensorboard import SummaryWriter
 
 
@@ -156,7 +157,8 @@ class NetworkTrainer(ABC):
 
         # setup and create output directories
         self.output_dir = output_dir
-        self.log_dir = self._create_output_dir('logs')
+        self.log_dir = self._create_output_dir(
+            f'logs/{datetime.datetime.now().strftime("%b%d-%H-%M-%S")}')
         self.model_dir = self._create_output_dir('models')
         self.onnx_dir = self._create_output_dir('onnx')
         self.checkpoint_dir = self._create_output_dir('checkpoints')
@@ -173,7 +175,8 @@ class NetworkTrainer(ABC):
         self.global_step = 0  # total steps run
         self.local_step = 0  # local step within a single epoch
 
-    def add_model(self, name: str, model: nn.Module, input_size: Tuple[int, ...], metric: str):
+    def add_model(self, name: str, model: nn.Module,
+                  input_size: Tuple[int, ...], metric='loss'):
         self.models.add(
             name,
             ModelInfo(
@@ -208,6 +211,9 @@ class NetworkTrainer(ABC):
 
     def fit(self, use_val_metric=True):
         """Run the entire training process."""
+        if self.train_dataloader is None:
+            raise ValueError('must set a dataloader builder to train')
+
         print(f'Using validation metric for best model : {use_val_metric}')
         best_metric = None
         self.pre_fit()
@@ -469,13 +475,13 @@ class NetworkTrainer(ABC):
             self._save_module(
                 model_info.model.module, model_info.input_size)
 
-    def _save_module(self, module, input_size: tuple, save_onnx=False, prefix=''):
+    def _save_module(self, module, input_size: Tuple[int, ...], save_onnx=False, prefix=''):
         """
         Saves a single module.
 
         Args:
             module (nn.Module): module to be saved
-            input_size (tuple): input dimensions
+            input_size (Tuple[int, ...]): input dimensions
             save_onnx (bool): save in ONNX format if True
             prefix: prefix for file name
         """

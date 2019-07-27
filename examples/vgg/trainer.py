@@ -14,15 +14,19 @@ class VGGTrainer(NetworkTrainer):
 
         vgg = SimpleModel()
         self.add_model(name='vgg', model=vgg, input_size=(1, 28, 28), metric='loss')
+
         self.set_dataloader_builder(
             MNISTLoaderBuilder(data_root='data_out', batch_size=self.batch_size))
+
         self.add_criterion('cross_entropy', nn.CrossEntropyLoss())
+
         self.add_optimizer('vgg_optim', optim.Adam(params=vgg.parameters(), lr=self.lr_init))
 
     def run_step(self, models, criteria, optimizers,
                  input_, train_stage, *args, **kwargs):
-        out = models.vgg.model(input_[0])
-        loss = criteria.cross_entropy(out, input_[1])
+        data, target_classes = input_
+        out = models.vgg.model(data)
+        loss = criteria.cross_entropy(out, target_classes)
 
         if train_stage == TrainStage.TRAIN:
             optimizers.vgg_optim.zero_grad()
