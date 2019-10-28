@@ -131,53 +131,53 @@ class NetworkTrainer(ABC):
             save_module_every_local (int): saves module information per this amount of steps
         """
         # initial settings
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self._device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         # training devices to use
-        self.device_ids = list(range(num_devices))
+        self._device_ids = list(range(num_devices))
 
         # set seed
         if seed is None:
-            self.seed = torch.initial_seed()
+            self._seed = torch.initial_seed()
         else:
-            self.seed = seed
+            self._seed = seed
             torch.manual_seed(seed)
-        print(f'Using random seed : {self.seed}')
+        print(f'Using random seed : {self._seed}')
 
-        self.trainer_name = self.__class__.__name__
+        self._trainer_name = self.__class__.__name__
 
         # prepare model(s) for training
-        self.models: AttributeHolder[ModelInfo] = AttributeHolder()
-        self.criteria: AttributeHolder[nn.Module] = AttributeHolder()
-        self.optimizers: AttributeHolder[Optimizer] = AttributeHolder()
+        self._models: AttributeHolder[ModelInfo] = AttributeHolder()
+        self._criteria: AttributeHolder[nn.Module] = AttributeHolder()
+        self._optimizers: AttributeHolder[Optimizer] = AttributeHolder()
 
         # dataloaders - should be set using set_dataloader_builder() after __init__()
-        self.train_dataloader = None
-        self.val_dataloader = None
-        self.test_dataloader = None
+        self._train_dataloader = None
+        self._val_dataloader = None
+        self._test_dataloader = None
 
         # setup and create output directories
-        self.output_dir = output_dir
-        self.log_dir = self._create_output_dir(
+        self._output_dir = output_dir
+        self._log_dir = self._create_output_dir(
             f'logs/{datetime.datetime.now().strftime("%b%d-%H-%M-%S")}')
-        self.model_dir = self._create_output_dir('models')
-        self.onnx_dir = self._create_output_dir('onnx')
-        self.checkpoint_dir = self._create_output_dir('checkpoints')
+        self._model_dir = self._create_output_dir('models')
+        self._onnx_dir = self._create_output_dir('onnx')
+        self._checkpoint_dir = self._create_output_dir('checkpoints')
 
         # save any other states or variables to maintain
-        self.total_epoch = epoch
-        self.lr_schedulers = lr_scheduler
-        self.log_every_local = log_every_local
-        self.save_module_every_local = save_module_every_local
-        self.writer = SummaryWriter(log_dir=self.log_dir)
+        self._total_epoch = epoch
+        self._lr_schedulers = lr_scheduler
+        self._log_every_local = log_every_local
+        self._save_module_every_local = save_module_every_local
+        self._writer = SummaryWriter(log_dir=self._log_dir)
 
         # initialize training process
-        self.epoch = 0
-        self.global_step = 0  # total steps run
-        self.local_step = 0  # local step within a single epoch
+        self._epoch = 0
+        self._global_step = 0  # total steps run
+        self._local_step = 0  # local step within a single epoch
 
     def add_model(self, name: str, model: nn.Module,
                   input_size: Tuple[int, ...], metric='loss'):
-        self.models.add(
+        self._models.add(
             name,
             ModelInfo(
                 model=self._register_model(model),
@@ -185,18 +185,18 @@ class NetworkTrainer(ABC):
                 metric=metric))
 
     def add_optimizer(self, name: str, optimizer: Optimizer):
-        self.optimizers.add(name, optimizer)
+        self._optimizers.add(name, optimizer)
 
     def add_criterion(self, name: str, criteria: nn.Module):
-        self.criteria.add(name, criteria)
+        self._criteria.add(name, criteria)
 
     def set_dataloader_builder(self, dataloader_builder: DataLoaderBuilder):
         if dataloader_builder is None:
             raise ValueError('dataloader builder should not be None')
 
-        self.train_dataloader = dataloader_builder.make_train_dataloader()
-        self.val_dataloader = dataloader_builder.make_validate_dataloader()
-        self.test_dataloader = dataloader_builder.make_test_dataloader()
+        self._train_dataloader = dataloader_builder.make_train_dataloader()
+        self._val_dataloader = dataloader_builder.make_validate_dataloader()
+        self._test_dataloader = dataloader_builder.make_test_dataloader()
 
     @property
     def standard_metric(self):
@@ -205,21 +205,21 @@ class NetworkTrainer(ABC):
 
     def _create_output_dir(self, dirname: str):
         """Creates a directory in the root output directory."""
-        path = os.path.join(self.output_dir, dirname)
+        path = os.path.join(self._output_dir, dirname)
         os.makedirs(path, exist_ok=True)
         return path
 
     def fit(self, use_val_metric=True):
         """Run the entire training process."""
-        if self.train_dataloader is None:
+        if self._train_dataloader is None:
             raise ValueError('must set a dataloader builder to train')
 
         print(f'Using validation metric for best model : {use_val_metric}')
         best_metric = None
         self.pre_fit()
 
-        for _ in range(self.epoch, self.total_epoch):
-            print(f'################# Starting epoch {self.epoch} ##################')
+        for _ in range(self._epoch, self._total_epoch):
+            print(f'################# Starting epoch {self._epoch} ##################')
 
             train_metrics = self.train()
 
@@ -228,12 +228,12 @@ class NetworkTrainer(ABC):
 
             # compare the metric and save the best model
             target_metric = val_metrics if use_val_metric else train_metrics
-            best_metric = self._save_best_model(self.models, best_metric, target_metric)
+            best_metric = self._save_best_model(self._models, best_metric, target_metric)
 
             # update learning rate based on validation metric
             self._update_lr(val_metrics)
 
-            self.epoch += 1
+            self._epoch += 1
         # run upon test set
         test_metrics = self.test()
         print('Training complete.')
@@ -245,8 +245,8 @@ class NetworkTrainer(ABC):
         pass
 
     def _update_lr(self, val_metrics):
-        if self.lr_schedulers is not None:
-            for lrs in self.lr_schedulers.values():
+        if self._lr_schedulers is not None:
+            for lrs in self._lr_schedulers.values():
                 lrs.step()
 
     @abstractmethod
@@ -290,16 +290,16 @@ class NetworkTrainer(ABC):
         metric_manager = MetricManager()  # initialize the metric manager
         dataset_size = len(dataloader)
         for step, input_ in enumerate(dataloader):
-            self.local_step = step
+            self._local_step = step
             input_ = self._to_device(self.input_transform(input_))  # transform dataloader's data
 
             # run a single step
             # this step is exposed to public for custom implementation
             # the parameters passed should have equal form as passed into the constructor
             output, loss = self.run_step(
-                self.models,
-                self.criteria,
-                self.optimizers,
+                self._models,
+                self._criteria,
+                self._optimizers,
                 input_,
                 train_stage)
 
@@ -313,7 +313,7 @@ class NetworkTrainer(ABC):
 
             # update train step if training
             if train_stage == TrainStage.TRAIN:
-                self.global_step += 1
+                self._global_step += 1
 
             # run pre-epoch-finish after the final step
             if step == dataset_size - 1:
@@ -324,21 +324,21 @@ class NetworkTrainer(ABC):
 
     def test(self):
         with torch.no_grad():
-            results = self._run_epoch(self.test_dataloader, TrainStage.TEST)
+            results = self._run_epoch(self._test_dataloader, TrainStage.TEST)
         return results
 
     def train(self):
         # train (model update)
-        return self._run_epoch(self.train_dataloader, TrainStage.TRAIN)
+        return self._run_epoch(self._train_dataloader, TrainStage.TRAIN)
 
     def validate(self):
         with torch.no_grad():
-            results = self._run_epoch(self.val_dataloader, TrainStage.VALIDATE)
+            results = self._run_epoch(self._val_dataloader, TrainStage.VALIDATE)
         return results
 
     def _register_model(self, model: nn.Module):
         return torch.nn.parallel.DataParallel(
-            model.to(self.device), device_ids=self.device_ids)
+            model.to(self._device), device_ids=self._device_ids)
 
     @staticmethod
     def make_performance_metric(input_: torch.Tensor, output, loss) -> dict:
@@ -347,20 +347,20 @@ class NetworkTrainer(ABC):
     def before_epoch(self, train_stage: TrainStage):
         # store the epoch number (to look good in tensorboard), and learning rate
         if train_stage == TrainStage.TRAIN:
-            self.writer.add_scalar('epoch', self.epoch, self.global_step)
-            self.save_learning_rate(self.writer, self.optimizers, self.global_step)
+            self._writer.add_scalar('epoch', self._epoch, self._global_step)
+            self.save_learning_rate(self._writer, self._optimizers, self._global_step)
 
     def post_step(
             self, input, output, metric: dict,
             dataset_size: int, train_stage: TrainStage):
         if train_stage == TrainStage.TRAIN:
-            if self.local_step % self.log_every_local == 0:
+            if self._local_step % self._log_every_local == 0:
                 self.log_metric(
-                    self.writer, metric, self.epoch, self.global_step,
-                    self.local_step, dataset_size, train_stage.value)
+                    self._writer, metric, self._epoch, self._global_step,
+                    self._local_step, dataset_size, train_stage.value)
 
             # save model information
-            if self.local_step % self.save_module_every_local == 0:
+            if self._local_step % self._save_module_every_local == 0:
                 self._save_module_summary_all()
 
     def pre_epoch_finish(
@@ -375,8 +375,8 @@ class NetworkTrainer(ABC):
             self, metric_manager: MetricManager, dataset_size: int, train_stage: TrainStage):
         if train_stage == TrainStage.VALIDATE or train_stage == TrainStage.TEST:
             self.log_metric(
-                self.writer, metric_manager.metric_avgs, self.epoch,
-                self.global_step, self.local_step,
+                self._writer, metric_manager.metric_avgs, self._epoch,
+                self._global_step, self._local_step,
                 dataset_size=dataset_size,
                 summary_group=train_stage.value)
 
@@ -394,22 +394,22 @@ class NetworkTrainer(ABC):
         """
         # get state_dict for all models
         model_state = {}
-        for model_name in self.models:
-            model_state[model_name] = self.models[model_name].model.state_dict()
+        for model_name in self._models:
+            model_state[model_name] = self._models[model_name].model.state_dict()
 
         optimizer_state = {}
-        for optim_name in self.optimizers:
-            optimizer_state[optim_name] = self.optimizers[optim_name].state_dict()
+        for optim_name in self._optimizers:
+            optimizer_state[optim_name] = self._optimizers[optim_name].state_dict()
 
         train_state = {
-            'epoch': self.epoch,
-            'step': self.global_step,
-            'seed': self.seed,
+            'epoch': self._epoch,
+            'step': self._global_step,
+            'seed': self._seed,
             'models': model_state,  # tuple of states (even for len == 1)
             'optimizers': optimizer_state,  # tuple of states
         }
-        cptf = f'{prefix}{self.trainer_name}_checkpoint_e{self.epoch}.pth'
-        torch.save(train_state, os.path.join(self.checkpoint_dir, cptf))
+        cptf = f'{prefix}{self._trainer_name}_checkpoint_e{self._epoch}.pth'
+        torch.save(train_state, os.path.join(self._checkpoint_dir, cptf))
 
     def resume(self, filename: str):
         """
@@ -419,25 +419,27 @@ class NetworkTrainer(ABC):
             filename (str): file path to checkpoint file
         """
         cpt = torch.load(filename)
-        self.seed = cpt['seed']
-        torch.manual_seed(self.seed)
-        self.epoch = cpt['epoch']
-        self.global_step = cpt['step']
+        self._seed = cpt['seed']
+        torch.manual_seed(self._seed)
+        self._epoch = cpt['epoch']
+        self._global_step = cpt['step']
 
         # load the model and optimizer
         model_state = cpt['models']
-        for model_name in self.models:
-            model_info = self.models[model_name]
+        for model_name in self._models:
+            model_info = self._models[model_name]
             model = model_info.model
             # replace ModelInfo's field
-            self.models[model_name] = model_info._replace(
+            self._models[model_name] = model_info._replace(
                 model=model.load_state_dict(model_state[model_name]))
 
-        self.optimizers = [o.load_state_dict(state_dict)
-                           for o, state_dict in zip(self.optimizers, cpt['optimizers'])]
+        self._optimizers = [
+            o.load_state_dict(state_dict)
+            for o, state_dict in zip(self._optimizers, cpt['optimizers'])
+        ]
 
     def cleanup(self):
-        self.writer.close()
+        self._writer.close()
 
     @staticmethod
     def input_transform(data):
@@ -470,8 +472,8 @@ class NetworkTrainer(ABC):
         return best_metric
 
     def _save_all_modules(self):
-        for model_name in self.models:
-            model_info = self.models[model_name]
+        for model_name in self._models:
+            model_info = self._models[model_name]
             self._save_module(
                 model_info.model.module, model_info.input_size)
 
@@ -488,9 +490,9 @@ class NetworkTrainer(ABC):
         if save_onnx:
             import onnx
             # TODO: input / output names?
-            path = os.path.join(self.onnx_dir, f'{prefix}{module.__class__.__name__}_onnx.pth')
+            path = os.path.join(self._onnx_dir, f'{prefix}{module.__class__.__name__}_onnx.pth')
             # add batch dimension to the dummy input sizes
-            dummy_input = torch.randn((1, ) + input_size).to(self.device)
+            dummy_input = torch.randn((1, ) + input_size).to(self._device)
             torch.onnx.export(module, dummy_input, path, verbose=True)
             # check validity of onnx IR and print the graph
             model = onnx.load(path)
@@ -499,8 +501,8 @@ class NetworkTrainer(ABC):
         else:
             # note epoch for default prefix
             if prefix == '':
-                prefix = f'e{self.epoch:03}'
-            path = os.path.join(self.model_dir, f'{prefix}_{module.__class__.__name__}.pth')
+                prefix = f'e{self._epoch:03}'
+            path = os.path.join(self._model_dir, f'{prefix}_{module.__class__.__name__}.pth')
             torch.save(module, path)
 
     @staticmethod
@@ -525,10 +527,10 @@ class NetworkTrainer(ABC):
                 print(f'Learning rate for optimizer {opt_name}: {lr}')
 
     def _save_module_summary_all(self, **kwargs):
-        for model_name in self.models:
-            model_info = self.models[model_name]
+        for model_name in self._models:
+            model_info = self._models[model_name]
             self._save_module_summary(
-                self.writer, model_name, model_info.model.module, self.global_step, **kwargs)
+                self._writer, model_name, model_info.model.module, self._global_step, **kwargs)
 
     @staticmethod
     def _save_module_summary(
@@ -569,7 +571,7 @@ class NetworkTrainer(ABC):
             device-transferred data
         """
         if isinstance(data, tuple):
-            return tuple([d.to(self.device) for d in data])
+            return tuple([d.to(self._device) for d in data])
         elif isinstance(data, list):
-            return [d.to(self.device) for d in data]
-        return data.to(self.device)
+            return [d.to(self._device) for d in data]
+        return data.to(self._device)
