@@ -117,6 +117,7 @@ class NetworkTrainer(ABC):
                  seed: int=None,
                  lr_scheduler: Dict[str, _LRScheduler]=None,
                  log_every_local=50,
+                 save_histogram=False,
                  save_module_every_local=500):
         """
         Initialize the trainer.
@@ -169,6 +170,7 @@ class NetworkTrainer(ABC):
         self._log_every_local = log_every_local
         self._save_module_every_local = save_module_every_local
         self._writer = SummaryWriter(log_dir=self._log_dir)
+        self._save_histogram = save_histogram
 
         # initialize training process
         self._epoch = 0
@@ -361,7 +363,7 @@ class NetworkTrainer(ABC):
 
             # save model information
             if self._local_step % self._save_module_every_local == 0:
-                self._save_module_summary_all()
+                self._save_module_summary_all(save_histogram=self._save_histogram)
 
     def pre_epoch_finish(
             self,
