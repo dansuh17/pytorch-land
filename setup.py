@@ -6,7 +6,7 @@ README_TEXT = (ROOT_PATH / 'README.md').read_text()
 
 setup(
     name='pytorch-land',
-    version='0.1.4',
+    version='0.1.5',
     description='pytorch-land for happy deep learning',
     long_description=README_TEXT,
     long_description_content_type='text/markdown',
