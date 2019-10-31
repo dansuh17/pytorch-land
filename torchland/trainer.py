@@ -537,6 +537,31 @@ class NetworkTrainer(ABC):
                 self._writer, model_name, model_info.model.module, self._global_step, **kwargs)
 
     @staticmethod
+    def _save_average_value(writer, param, name: str, value_type: str, step: int,
+                            save_histogram=False, verbose=False):
+        if value_type == 'grad':
+            if param.grad is None:
+                return  # ignore None
+            val = param.grad
+        elif value_type == 'data':
+            if param.data is None:
+                return  # ignore None
+            val = param.data
+        else:
+            raise ValueError(f'cannot save: {value_type} of parameter: {name}')
+
+        avg_val = torch.mean(val)
+        if verbose:
+            print(f'\tavg_{value_type} for {name} = {avg_val:.6f}')
+
+        writer.add_scalar(f'avg_{value_type}/{name}', avg_val.item(), step)
+        if save_histogram:
+            try:
+                writer.add_histogram(f'{value_type}/{name}', val.cpu().numpy(), step)
+            except ValueError as ve:
+                print(f'saving histogram of {name}({value_type}) at step: {step} failed - {ve}')
+
+    @staticmethod
     def _save_module_summary(
             writer, module_name: str, module: nn.Module, step: int,
             save_histogram=False, verbose=False):
@@ -546,29 +571,12 @@ class NetworkTrainer(ABC):
 
         with torch.no_grad():
             for p_name, parameter in module.named_parameters():
-                if parameter.grad is not None:
-                    avg_grad = torch.mean(parameter.grad)
-                    if verbose:
-                        print(f'\tavg_grad for {p_name}_{module_name} = {avg_grad:.6f}')
-                    writer.add_scalar(f'avg_grad/{module_name}_{p_name}', avg_grad.item(), step)
-                    if save_histogram:
-                        try:
-                            writer.add_histogram(
-                                f'grad/{module_name}_{p_name}', parameter.grad.cpu().numpy(), step)
-                        except ValueError as ve:
-                            print(f'saving histogram at step: {step} failed - {ve}')
-
-                if parameter.data is not None:
-                    avg_weight = torch.mean(parameter.data)
-                    if verbose:
-                        print(f'\tavg_weight for {module_name}_{p_name} = {avg_weight:.6f}')
-                    writer.add_scalar(f'avg_weight/{module_name}_{p_name}', avg_weight.item(), step)
-                    try:
-                        if save_histogram:
-                            writer.add_histogram(
-                                f'weight/{module_name}_{p_name}', parameter.data.cpu().numpy(), step)
-                    except ValueError as ve:
-                        print(f'saving histogram at step: {step} failed - {ve}')
+                NetworkTrainer._save_average_value(
+                    writer, parameter, name=f'{p_name}_{module_name}', value_type='grad',
+                    step=step, save_histogram=save_histogram, verbose=verbose)
+                NetworkTrainer._save_average_value(
+                    writer, parameter, name=f'{p_name}_{module_name}', value_type='data',
+                    step=step, save_histogram=save_histogram, verbose=verbose)
 
     def _to_device(self, data):
         """
