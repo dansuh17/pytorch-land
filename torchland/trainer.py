@@ -552,17 +552,23 @@ class NetworkTrainer(ABC):
                         print(f'\tavg_grad for {p_name}_{module_name} = {avg_grad:.6f}')
                     writer.add_scalar(f'avg_grad/{module_name}_{p_name}', avg_grad.item(), step)
                     if save_histogram:
-                        writer.add_histogram(
-                            f'grad/{module_name}_{p_name}', parameter.grad.cpu().numpy(), step)
+                        try:
+                            writer.add_histogram(
+                                f'grad/{module_name}_{p_name}', parameter.grad.cpu().numpy(), step)
+                        except ValueError as ve:
+                            print(f'saving histogram at step: {step} failed - {ve}')
 
                 if parameter.data is not None:
                     avg_weight = torch.mean(parameter.data)
                     if verbose:
                         print(f'\tavg_weight for {module_name}_{p_name} = {avg_weight:.6f}')
                     writer.add_scalar(f'avg_weight/{module_name}_{p_name}', avg_weight.item(), step)
-                    if save_histogram:
-                        writer.add_histogram(
-                            f'weight/{module_name}_{p_name}', parameter.data.cpu().numpy(), step)
+                    try:
+                        if save_histogram:
+                            writer.add_histogram(
+                                f'weight/{module_name}_{p_name}', parameter.data.cpu().numpy(), step)
+                    except ValueError as ve:
+                        print(f'saving histogram at step: {step} failed - {ve}')
 
     def _to_device(self, data):
         """
