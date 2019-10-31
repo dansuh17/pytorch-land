@@ -129,6 +129,8 @@ class NetworkTrainer(ABC):
             seed (int): random seed to use
             lr_scheduler (None|Dict[str, _LRScheduler]): learning rate scheduler
             log_every_local (int): log the progress every `log_every_local` steps
+            save_histogram (bool): if True, save histogram for every `log_every_local` steps
+                This usually stores large arrays - set to `False` for fast training.
             save_module_every_local (int): saves module information per this amount of steps
         """
         # initial settings
