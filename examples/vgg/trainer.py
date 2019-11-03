@@ -1,7 +1,6 @@
-import torch
 from torch import nn
 from torch import optim
-from torchland.trainer import NetworkTrainer, TrainStage
+from torchland.trainer.trainer import NetworkTrainer, TrainStage
 from torchland.datasets.img_popular import MNISTLoaderBuilder
 from .model import SimpleModel
 

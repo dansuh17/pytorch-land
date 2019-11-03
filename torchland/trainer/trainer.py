@@ -4,9 +4,8 @@ import sys
 import operator
 from abc import ABC, abstractmethod
 from typing import Dict, Any, TypeVar, Generic, Iterable, Union, Tuple
-import math
 from enum import Enum, unique
-from collections import defaultdict, namedtuple
+from collections import namedtuple
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
@@ -14,6 +13,7 @@ from torch.optim.optimizer import Optimizer
 from torch.optim.lr_scheduler import _LRScheduler
 from torchland.datasets.loader_builder import DataLoaderBuilder
 from torch.utils.tensorboard import SummaryWriter
+from .metric_manager import MetricManager
 
 
 """Tuple storing model information."""
@@ -31,51 +31,6 @@ class TrainStage(Enum):
     TRAIN = 'train'
     VALIDATE = 'validate'
     TEST = 'test'
-
-
-class MetricManager:
-    """Class for managing multiple metrics."""
-    def __init__(self):
-        self.metric_counter = defaultdict(int)  # init to 0
-        self.metric_avgs = defaultdict(float)  # init to 0.0
-        self.metric_mins = defaultdict(lambda: math.inf)
-        self.metric_maxes = defaultdict(lambda: -math.inf)
-
-    def append_metric(self, metric: dict):
-        """
-        Introduce a new metric values and update the statistics.
-        It mainly updates the count, average value, minimum value, and the maximum value.
-
-        Args:
-            metric (dict): various metric values
-        """
-        for key, val in metric.items():
-            prev_count = self.metric_counter[key]
-            prev_avg = self.metric_avgs[key]
-            total_val = prev_count * prev_avg + val
-
-            # calculate the new average
-            self.metric_avgs[key] = total_val / (prev_count + 1)
-            self.metric_counter[key] = prev_count + 1
-            if val < self.metric_mins[key]:
-                self.metric_mins[key] = val
-            if val > self.metric_maxes[key]:
-                self.metric_maxes[key] = val
-
-    def mean(self, key: str) -> float:
-        """
-        Retrieve the mean value of the given key.
-
-        Args:
-            key (str): the key value
-
-        Returns:
-            the mean value of the key
-        """
-        return self.metric_avgs[key]
-
-    def set_mean(self, key: str, val):
-        self.metric_avgs[key] = val
 
 
 T = TypeVar('T')
@@ -100,6 +55,11 @@ class AttributeHolder(Generic[T], Iterable):
 
     def __getitem__(self, item):
         return getattr(self, item)
+
+
+# Container of each data loaders
+DataLoaders = namedtuple(
+    'DataLoaders', ['train_loader', 'val_loader', 'test_loader'])
 
 
 class NetworkTrainer(ABC):
@@ -154,9 +114,7 @@ class NetworkTrainer(ABC):
         self._optimizers: AttributeHolder[Optimizer] = AttributeHolder()
 
         # dataloaders - should be set using set_dataloader_builder() after __init__()
-        self._train_dataloader = None
-        self._val_dataloader = None
-        self._test_dataloader = None
+        self._dataloaders = None
 
         # setup and create output directories
         self._output_dir = output_dir
@@ -194,13 +152,15 @@ class NetworkTrainer(ABC):
     def add_criterion(self, name: str, criteria: nn.Module):
         self._criteria.add(name, criteria)
 
-    def set_dataloader_builder(self, dataloader_builder: DataLoaderBuilder):
+    def set_dataloaders(self, dataloader_builder: DataLoaderBuilder):
         if dataloader_builder is None:
             raise ValueError('dataloader builder should not be None')
 
-        self._train_dataloader = dataloader_builder.make_train_dataloader()
-        self._val_dataloader = dataloader_builder.make_validate_dataloader()
-        self._test_dataloader = dataloader_builder.make_test_dataloader()
+        self._dataloaders = DataLoaders(
+            train_loader=dataloader_builder.make_train_dataloader(),
+            val_loader=dataloader_builder.make_validate_dataloader(),
+            test_loader=dataloader_builder.make_test_dataloader(),
+        )
 
     @property
     def standard_metric(self):
@@ -215,7 +175,7 @@ class NetworkTrainer(ABC):
 
     def fit(self, use_val_metric=True):
         """Run the entire training process."""
-        if self._train_dataloader is None:
+        if self._dataloaders is None:
             raise ValueError('must set a dataloader builder to train')
 
         print(f'Using validation metric for best model : {use_val_metric}')
@@ -328,16 +288,16 @@ class NetworkTrainer(ABC):
 
     def test(self):
         with torch.no_grad():
-            results = self._run_epoch(self._test_dataloader, TrainStage.TEST)
+            results = self._run_epoch(self._dataloaders.test_loader, TrainStage.TEST)
         return results
 
     def train(self):
         # train (model update)
-        return self._run_epoch(self._train_dataloader, TrainStage.TRAIN)
+        return self._run_epoch(self._dataloaders.train_loader, TrainStage.TRAIN)
 
     def validate(self):
         with torch.no_grad():
-            results = self._run_epoch(self._val_dataloader, TrainStage.VALIDATE)
+            results = self._run_epoch(self._dataloaders.val_loader, TrainStage.VALIDATE)
         return results
 
     def _register_model(self, model: nn.Module):
