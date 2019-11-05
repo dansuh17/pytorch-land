@@ -75,7 +75,6 @@ class NetworkTrainer(ABC):
                  output_dir='data_out',
                  num_devices=1,
                  seed: int=None,
-                 lr_scheduler: Dict[str, _LRScheduler]=None,
                  log_every_local=50,
                  save_histogram=False,
                  save_module_every_local=500):
@@ -87,7 +86,6 @@ class NetworkTrainer(ABC):
             output_dir (str): root output directory
             num_devices (int): number of GPU devices to split the batch
             seed (int): random seed to use
-            lr_scheduler (None|Dict[str, _LRScheduler]): learning rate scheduler
             log_every_local (int): log the progress every `log_every_local` steps
             save_histogram (bool): if True, save histogram for every `log_every_local` steps
                 This usually stores large arrays - set to `False` for fast training.
@@ -112,6 +110,7 @@ class NetworkTrainer(ABC):
         self._models: AttributeHolder[ModelInfo] = AttributeHolder()
         self._criteria: AttributeHolder[nn.Module] = AttributeHolder()
         self._optimizers: AttributeHolder[Optimizer] = AttributeHolder()
+        self._lr_schedulers: AttributeHolder[_LRScheduler] = AttributeHolder()
 
         # dataloaders - should be set using set_dataloader_builder() after __init__()
         self._dataloaders = None
@@ -126,7 +125,6 @@ class NetworkTrainer(ABC):
 
         # save any other states or variables to maintain
         self._total_epoch = epoch
-        self._lr_schedulers = lr_scheduler
         self._log_every_local = log_every_local
         self._save_module_every_local = save_module_every_local
         self._writer = SummaryWriter(log_dir=self._log_dir)
@@ -148,6 +146,9 @@ class NetworkTrainer(ABC):
 
     def add_optimizer(self, name: str, optimizer: Optimizer):
         self._optimizers.add(name, optimizer)
+
+    def add_lr_scheduler(self, name: str, scheduler: _LRScheduler):
+        self._lr_schedulers.add(name, scheduler)
 
     def add_criterion(self, name: str, criteria: nn.Module):
         self._criteria.add(name, criteria)
@@ -210,8 +211,8 @@ class NetworkTrainer(ABC):
 
     def _update_lr(self, val_metrics):
         if self._lr_schedulers is not None:
-            for lrs in self._lr_schedulers.values():
-                lrs.step()
+            for lrs_name in self._lr_schedulers:
+                self._lr_schedulers.__getitem__(lrs_name).step()
 
     @abstractmethod
     def run_step(
