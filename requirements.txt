@@ -5,7 +5,7 @@ attrs==19.2.0
 audioread==2.1.6
 autopep8==1.4
 backcall==0.1.0
-bleach==2.1.4
+bleach==3.1.1
 cffi==1.12.3
 cycler==0.10.0
 decorator==4.3.0
