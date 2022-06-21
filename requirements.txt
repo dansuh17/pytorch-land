@@ -42,7 +42,7 @@ nbconvert==5.4.0
 nbformat==4.4.0
 notebook==6.1.5
 numba==0.39.0
-numpy==1.15.1
+numpy==1.22.0
 onnx==1.6.0
 pandas==0.25.1
 pandocfilters==1.4.2
